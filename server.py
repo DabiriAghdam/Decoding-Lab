@@ -104,7 +104,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
         self.wfile.flush()
 
-    def _generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k):
+    def _generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
         device = runtime["device"]
@@ -120,12 +120,21 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         top_p = float(top_p)
         top_k = int(top_k) if top_k is not None else 0
 
-        do_sample = temperature > 0.0001
+        beam_size = max(1, int(beam_size or 1))
+        do_sample = (temperature > 0.0001) and beam_size == 1
         gen_kwargs = {
             "max_new_tokens": max_tokens,
             "pad_token_id": tokenizer.pad_token_id,
         }
-        if do_sample:
+        if beam_size > 1:
+            gen_kwargs.update(
+                {
+                    "do_sample": False,
+                    "num_beams": beam_size,
+                    "early_stopping": True,
+                }
+            )
+        elif do_sample:
             gen_kwargs.update(
                 {
                     "do_sample": True,
@@ -158,7 +167,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
             "tokens_per_second": float(completion_tokens / elapsed_s),
         }
 
-    def _stream_generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k):
+    def _stream_generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
         device = runtime["device"]
@@ -173,7 +182,8 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         temperature = float(temperature)
         top_p = float(top_p)
         top_k = int(top_k) if top_k is not None else 0
-        do_sample = temperature > 0.0001
+        beam_size = max(1, int(beam_size or 1))
+        do_sample = (temperature > 0.0001) and beam_size == 1
 
         streamer = TextIteratorStreamer(
             tokenizer,
@@ -187,7 +197,15 @@ class PresentationHandler(SimpleHTTPRequestHandler):
             "pad_token_id": tokenizer.pad_token_id,
             "streamer": streamer,
         }
-        if do_sample:
+        if beam_size > 1:
+            gen_kwargs.update(
+                {
+                    "do_sample": False,
+                    "num_beams": beam_size,
+                    "early_stopping": True,
+                }
+            )
+        elif do_sample:
             gen_kwargs.update(
                 {
                     "do_sample": True,
@@ -325,6 +343,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
                     temperature=body.get("temperature", 0.9),
                     top_p=body.get("top_p", 1.0),
                     top_k=body.get("top_k"),
+                    beam_size=body.get("beam_size", 1),
                 )
                 payload = {
                     "id": f"local-{int(time.time() * 1000)}",
@@ -373,6 +392,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
                     temperature=body.get("temperature", 0.9),
                     top_p=body.get("top_p", 1.0),
                     top_k=body.get("top_k"),
+                    beam_size=body.get("beam_size", 1),
                 ):
                     self._send_sse(event)
                 self.close_connection = True

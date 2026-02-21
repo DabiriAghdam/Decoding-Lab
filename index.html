@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Decoding Control Center</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap');
@@ -563,19 +564,24 @@
               <input id="aMaxTokens" type="range" min="20" max="200" step="10" value="120" />
             </div>
 
-            <div class="field">
+            <div id="aTempWrap" class="field">
               <label for="aTemp">Temperature: <span id="aTempVal">1.00</span></label>
               <input id="aTemp" type="range" min="0" max="1.8" step="0.05" value="1.00" />
             </div>
 
-            <div class="field">
+            <div id="aTopkWrap" class="field">
               <label for="aTopk">Top-k: <span id="aTopkVal">40</span></label>
               <input id="aTopk" type="range" min="1" max="120" step="1" value="40" />
             </div>
 
-            <div class="field">
+            <div id="aToppWrap" class="field">
               <label for="aTopp">Top-p: <span id="aToppVal">0.92</span></label>
               <input id="aTopp" type="range" min="0.20" max="1.00" step="0.01" value="0.92" />
+            </div>
+
+            <div id="aBeamWrap" class="field">
+              <label for="aBeam">Beam Size (b): <span id="aBeamVal">4</span></label>
+              <input id="aBeam" type="range" min="1" max="8" step="1" value="4" />
             </div>
 
             <label class="toggle">
@@ -612,19 +618,24 @@
               <input id="bMaxTokens" type="range" min="20" max="200" step="10" value="120" />
             </div>
 
-            <div class="field">
+            <div id="bTempWrap" class="field">
               <label for="bTemp">Temperature: <span id="bTempVal">1.00</span></label>
               <input id="bTemp" type="range" min="0" max="1.8" step="0.05" value="1.00" />
             </div>
 
-            <div class="field">
+            <div id="bTopkWrap" class="field">
               <label for="bTopk">Top-k: <span id="bTopkVal">40</span></label>
               <input id="bTopk" type="range" min="1" max="120" step="1" value="40" />
             </div>
 
-            <div class="field">
+            <div id="bToppWrap" class="field">
               <label for="bTopp">Top-p: <span id="bToppVal">0.92</span></label>
               <input id="bTopp" type="range" min="0.20" max="1.00" step="0.01" value="0.92" />
+            </div>
+
+            <div id="bBeamWrap" class="field">
+              <label for="bBeam">Beam Size (b): <span id="bBeamVal">4</span></label>
+              <input id="bBeam" type="range" min="1" max="8" step="1" value="4" />
             </div>
 
             <label class="toggle">
@@ -736,11 +747,6 @@
           </div>
 
           <div class="field">
-            <label for="distTemp">Sampling Temperature: <span id="distTempVal">0.90</span></label>
-            <input id="distTemp" type="range" min="0.00" max="1.80" step="0.05" value="0.90" />
-          </div>
-
-          <div class="field">
             <label for="nextTokenStrategy">Next Token Strategy</label>
             <select id="nextTokenStrategy">
               <option value="greedy">Greedy</option>
@@ -815,7 +821,7 @@
 
     function strategyShort(cfg) {
       if (cfg.strategy === 'greedy') return 'deterministic';
-      if (cfg.strategy === 'beam') return 'low-T + narrow p';
+      if (cfg.strategy === 'beam') return `b=${cfg.beam_size}`;
       if (cfg.strategy === 'topk') return `k=${cfg.top_k}, T=${cfg.temperature.toFixed(2)}`;
       if (cfg.strategy === 'topp') return `p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
       return `k=${cfg.top_k}, p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
@@ -834,15 +840,16 @@
     attachRange('aTemp', 'aTempVal', (v) => v.toFixed(2));
     attachRange('aTopk', 'aTopkVal');
     attachRange('aTopp', 'aToppVal', (v) => v.toFixed(2));
+    attachRange('aBeam', 'aBeamVal');
     attachRange('aMaxTokens', 'aMaxTokensVal');
     attachRange('bTemp', 'bTempVal', (v) => v.toFixed(2));
     attachRange('bTopk', 'bTopkVal');
     attachRange('bTopp', 'bToppVal', (v) => v.toFixed(2));
+    attachRange('bBeam', 'bBeamVal');
     attachRange('bMaxTokens', 'bMaxTokensVal');
     attachRange('distN', 'distNVal');
     attachRange('kCut', 'kCutVal');
     attachRange('pCut', 'pCutVal', (v) => v.toFixed(2));
-    attachRange('distTemp', 'distTempVal', (v) => v.toFixed(2));
 
     function mergePromptCompletion(prompt, completion) {
       const p = (prompt || '').trim();
@@ -878,6 +885,7 @@
         temperature: Number($(`${prefix}Temp`).value),
         top_k: Number($(`${prefix}Topk`).value),
         top_p: Number($(`${prefix}Topp`).value),
+        beam_size: Number($(`${prefix}Beam`).value),
         stream: $(`${prefix}Stream`).checked,
       };
     }
@@ -894,8 +902,9 @@
         return body;
       }
       if (cfg.strategy === 'beam') {
-        body.temperature = 0.2;
-        body.top_p = 0.35;
+        body.temperature = 0;
+        body.top_p = 1;
+        body.beam_size = Math.max(1, Number(cfg.beam_size) || 1);
         return body;
       }
       if (cfg.strategy === 'topk') {
@@ -1018,10 +1027,22 @@
       $(`sample${prefix.toUpperCase()}Title`).textContent = `Sample ${prefix.toUpperCase()} · ${label} (${detail})`;
     }
 
-    ['aStrategy', 'aTemp', 'aTopk', 'aTopp'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('a')));
-    ['bStrategy', 'bTemp', 'bTopk', 'bTopp'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('b')));
-    $('aStrategy').addEventListener('change', () => updateSampleTitle('a'));
-    $('bStrategy').addEventListener('change', () => updateSampleTitle('b'));
+    function updateMethodControls(prefix) {
+      const strategy = $(`${prefix}Strategy`).value;
+      const showTemp = strategy === 'topk' || strategy === 'topp' || strategy === 'hybrid';
+      const showTopK = strategy === 'topk' || strategy === 'hybrid';
+      const showTopP = strategy === 'topp' || strategy === 'hybrid';
+      const showBeam = strategy === 'beam';
+      $(`${prefix}TempWrap`).style.display = showTemp ? '' : 'none';
+      $(`${prefix}TopkWrap`).style.display = showTopK ? '' : 'none';
+      $(`${prefix}ToppWrap`).style.display = showTopP ? '' : 'none';
+      $(`${prefix}BeamWrap`).style.display = showBeam ? '' : 'none';
+    }
+
+    ['aStrategy', 'aTemp', 'aTopk', 'aTopp', 'aBeam'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('a')));
+    ['bStrategy', 'bTemp', 'bTopk', 'bTopp', 'bBeam'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('b')));
+    $('aStrategy').addEventListener('change', () => { updateSampleTitle('a'); updateMethodControls('a'); });
+    $('bStrategy').addEventListener('change', () => { updateSampleTitle('b'); updateMethodControls('b'); });
 
     const genStatusEl = $('genStatus');
 
@@ -1041,7 +1062,11 @@
       if (!fromBatch) button.disabled = true;
 
       try {
-        const out = cfg.stream
+        const useStream = cfg.stream && cfg.strategy !== 'beam';
+        if (cfg.stream && cfg.strategy === 'beam') {
+          statusEl.textContent = 'Beam-ish runs non-streaming.';
+        }
+        const out = useStream
           ? await localChatStream(
               cfg,
               (partial) => {
@@ -1291,21 +1316,7 @@
       leftMethod = leftIsPrimary ? pair.leftName : pair.rightName;
       rightMethod = leftIsPrimary ? pair.rightName : pair.leftName;
       try {
-        const outFirst = await localChatStream(
-          first,
-          (partial) => {
-            if (leftIsPrimary) $('leftText').textContent = mergePromptCompletion(prompt, partial);
-            else $('rightText').textContent = mergePromptCompletion(prompt, partial);
-          }
-        );
-
-        const outSecond = await localChatStream(
-          second,
-          (partial) => {
-            if (leftIsPrimary) $('rightText').textContent = mergePromptCompletion(prompt, partial);
-            else $('leftText').textContent = mergePromptCompletion(prompt, partial);
-          }
-        );
+        const [outFirst, outSecond] = await Promise.all([localChat(first), localChat(second)]);
 
         if (leftIsPrimary) {
           $('leftText').textContent = outFirst.fullText;
@@ -1485,7 +1496,7 @@
           `Top-k: ${inTopK ? 'yes' : 'no'}`,
           `Top-p: ${inTopP ? 'yes' : 'no'}`,
         ].join('<br>'));
-        color.push(inTopP ? barTopP : inTopK ? barTopK : barTail);
+        color.push(inTopP ? barTopP : barTail);
       }
 
       const tickStep = Math.max(1, Math.ceil(x.length / 24));
@@ -1530,6 +1541,14 @@
           shapes: [
             {
               type: 'line',
+              x0: k + 0.5,
+              x1: k + 0.5,
+              y0: 0,
+              y1: yMax,
+              line: { color: topKLine, width: 2, dash: 'dash' },
+            },
+            {
+              type: 'line',
               x0: topPBoundaryX,
               x1: topPBoundaryX,
               y0: 0,
@@ -1538,6 +1557,13 @@
             },
           ],
           annotations: [
+            {
+              x: k + 0.5,
+              y: yMax * 0.92,
+              text: 'Top-k boundary',
+              showarrow: false,
+              font: { size: 11, color: topKLine },
+            },
             {
               x: topPBoundaryX,
               y: yMax,
@@ -1633,7 +1659,7 @@
       try {
         const prompt = $('distPrompt').value.trim() || 'The report found that';
         const strategy = $('nextTokenStrategy').value;
-        const temperature = Number($('distTemp').value);
+        const temperature = 0.9;
         const topP = Number($('pCut').value);
         const topK = Number($('kCut').value);
         const body = {
@@ -1702,6 +1728,8 @@
 
     updateSampleTitle('a');
     updateSampleTitle('b');
+    updateMethodControls('a');
+    updateMethodControls('b');
     try {
       const savedTheme = localStorage.getItem('decoding_theme') || 'forest';
       $('themeSelect').value = savedTheme;
