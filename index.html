@@ -387,7 +387,16 @@
       <div class="hero-row">
         <div class="field">
           <label for="model">Model</label>
-          <input id="model" type="text" value="gpt2-large" />
+          <select id="model">
+            <option value="gpt2" selected>gpt2 (small)</option>
+            <option value="gpt2-medium">gpt2-medium</option>
+            <option value="gpt2-large">gpt2-large</option>
+            <option value="gpt2-xl">gpt2-xl</option>
+            <option value="distilgpt2">distilgpt2</option>
+            <option value="EleutherAI/pythia-410m-deduped">EleutherAI/pythia-410m-deduped</option>
+            <option value="Qwen/Qwen2.5-0.5B">Qwen/Qwen2.5-0.5B</option>
+            <option value="TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T">TinyLlama-1.1B</option>
+          </select>
         </div>
         <button id="preloadModel">Preload Model</button>
         <button id="testConn">Test Backend</button>
@@ -623,6 +632,21 @@
             <input id="pCut" type="range" min="0.20" max="0.99" step="0.01" value="0.90" />
           </div>
 
+          <div class="field">
+            <label for="distTemp">Sampling Temperature: <span id="distTempVal">0.90</span></label>
+            <input id="distTemp" type="range" min="0.00" max="1.80" step="0.05" value="0.90" />
+          </div>
+
+          <div class="field">
+            <label for="nextTokenStrategy">Next Token Strategy</label>
+            <select id="nextTokenStrategy">
+              <option value="greedy">Greedy</option>
+              <option value="topk">Top-k</option>
+              <option value="topp" selected>Top-p (Nucleus)</option>
+              <option value="hybrid">Top-k + Top-p</option>
+            </select>
+          </div>
+
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <button id="fetchDist" class="primary">Refresh Distribution</button>
             <button id="generateNextToken">Generate Next Token</button>
@@ -657,7 +681,7 @@
     tabs.forEach((btn) => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
 
     function apiConfig() {
-      return { model: $('model').value.trim() || 'gpt2-large' };
+      return { model: $('model').value.trim() || 'gpt2' };
     }
 
     function strategyLabel(v) {
@@ -695,6 +719,7 @@
     attachRange('distN', 'distNVal');
     attachRange('kCut', 'kCutVal');
     attachRange('pCut', 'pCutVal', (v) => v.toFixed(2));
+    attachRange('distTemp', 'distTempVal', (v) => v.toFixed(2));
 
     function mergePromptCompletion(prompt, completion) {
       const p = (prompt || '').trim();
@@ -953,6 +978,7 @@
       if (promptTemplates[key]) {
         $('distPrompt').value = promptTemplates[key];
         $('nextTokenStatus').textContent = 'Template applied to distribution prompt.';
+        fetchRealDistribution();
       }
     });
 
@@ -1183,7 +1209,7 @@
       return token
         .replace(/\n/g, '\\n')
         .replace(/\t/g, '\\t')
-        .replace(/ /g, '·');
+        .replace(/ /g, '␠');
     }
 
     function drawDistribution() {
@@ -1286,6 +1312,16 @@
           },
           shapes: [
             {
+              type: 'rect',
+              x0: 0.5,
+              x1: pLen + 0.5,
+              y0: 0,
+              y1: yMax,
+              line: { width: 0 },
+              fillcolor: 'rgba(36, 120, 79, 0.12)',
+              layer: 'below',
+            },
+            {
               type: 'line',
               x0: k + 0.5,
               x1: k + 0.5,
@@ -1313,7 +1349,7 @@
             {
               x: pLen + 0.5,
               y: yMax,
-              text: 'Top-p boundary',
+              text: `Top-p region (n=${pLen})`,
               showarrow: false,
               font: { size: 11, color: '#24784f' },
             },
@@ -1364,14 +1400,30 @@
       $('generateNextToken').disabled = true;
       try {
         const prompt = $('distPrompt').value.trim() || 'The report found that';
+        const strategy = $('nextTokenStrategy').value;
+        const temperature = Number($('distTemp').value);
+        const topP = Number($('pCut').value);
+        const topK = Number($('kCut').value);
         const body = {
           model: apiConfig().model,
           prompt,
           max_tokens: 1,
-          temperature: 0.9,
-          top_p: Number($('pCut').value),
-          top_k: Number($('kCut').value),
         };
+        if (strategy === 'greedy') {
+          body.temperature = 0;
+          body.top_p = 1;
+        } else if (strategy === 'topk') {
+          body.temperature = temperature;
+          body.top_p = 1;
+          body.top_k = topK;
+        } else if (strategy === 'topp') {
+          body.temperature = temperature;
+          body.top_p = topP;
+        } else {
+          body.temperature = temperature;
+          body.top_p = topP;
+          body.top_k = topK;
+        }
         const res = await fetch('/api/local/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1382,7 +1434,8 @@
         const token = data?.choices?.[0]?.text || '';
         if (!token) throw new Error('No token returned.');
         $('distPrompt').value = `${prompt}${token}`;
-        $('nextTokenStatus').textContent = `Added token: ${safeTokenLabel(token)}`;
+        const strategyName = strategy === 'topp' ? 'top-p' : strategy === 'topk' ? 'top-k' : strategy === 'hybrid' ? 'top-k+top-p' : 'greedy';
+        $('nextTokenStatus').textContent = `Added token (${strategyName}): ${safeTokenLabel(token)}`;
         await fetchRealDistribution();
       } catch (err) {
         $('nextTokenStatus').textContent = `Failed: ${err.message}`;
