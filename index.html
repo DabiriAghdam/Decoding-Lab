@@ -565,7 +565,6 @@
                 <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp" selected>Top-p (Nucleus)</option>
-                <option value="hybrid">Top-k + Top-p</option>
               </select>
             </div>
 
@@ -619,7 +618,6 @@
                 <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp">Top-p (Nucleus)</option>
-                <option value="hybrid">Top-k + Top-p</option>
               </select>
             </div>
 
@@ -763,13 +761,11 @@
               <option value="beam">Beam Search</option>
               <option value="topk">Top-k</option>
               <option value="topp" selected>Top-p (Nucleus)</option>
-              <option value="hybrid">Top-k + Top-p</option>
               <option value="chart_click">Chart Click (Selected Token)</option>
             </select>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <button id="fetchDist" class="primary">Refresh Distribution</button>
+          <div style="display:grid;grid-template-columns:1fr;gap:8px;">
             <button id="generateNextToken">Generate Next Token</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -825,7 +821,6 @@
       if (v === 'greedy') return 'Greedy';
       if (v === 'beam') return 'Beam Search';
       if (v === 'topk') return 'Top-k';
-      if (v === 'hybrid') return 'Top-k + Top-p';
       return 'Top-p (Nucleus)';
     }
 
@@ -833,8 +828,7 @@
       if (cfg.strategy === 'greedy') return 'deterministic';
       if (cfg.strategy === 'beam') return `b=${cfg.beam_size}`;
       if (cfg.strategy === 'topk') return `k=${cfg.top_k}, T=${cfg.temperature.toFixed(2)}`;
-      if (cfg.strategy === 'topp') return `p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
-      return `k=${cfg.top_k}, p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
+      return `p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
     }
 
     function attachRange(rangeId, valueId, formatter) {
@@ -1039,9 +1033,9 @@
 
     function updateMethodControls(prefix) {
       const strategy = $(`${prefix}Strategy`).value;
-      const showTemp = strategy === 'topk' || strategy === 'topp' || strategy === 'hybrid';
-      const showTopK = strategy === 'topk' || strategy === 'hybrid';
-      const showTopP = strategy === 'topp' || strategy === 'hybrid';
+      const showTemp = strategy === 'topk' || strategy === 'topp';
+      const showTopK = strategy === 'topk';
+      const showTopP = strategy === 'topp';
       const showBeam = strategy === 'beam';
       $(`${prefix}TempWrap`).style.display = showTemp ? '' : 'none';
       $(`${prefix}TopkWrap`).style.display = showTopK ? '' : 'none';
@@ -1614,7 +1608,6 @@
         return;
       }
       distInFlight = true;
-      $('fetchDist').disabled = true;
       $('generateNextToken').disabled = true;
       $('distStatus').textContent = 'Loading distribution...';
 
@@ -1633,7 +1626,6 @@
       } catch (err) {
         $('distStatus').textContent = `Failed: ${err.message}`;
       } finally {
-        $('fetchDist').disabled = false;
         $('generateNextToken').disabled = false;
         distInFlight = false;
         if (pendingDistRefresh) {
@@ -1704,10 +1696,6 @@
         } else if (strategy === 'topp') {
           body.temperature = temperature;
           body.top_p = topP;
-        } else {
-          body.temperature = temperature;
-          body.top_p = topP;
-          body.top_k = topK;
         }
         let token = '';
         if (strategy === 'chart_click') {
@@ -1730,8 +1718,7 @@
           strategy === 'chart_click' ? 'chart-click' :
           strategy === 'beam' ? 'beam-search' :
           strategy === 'topp' ? 'top-p' :
-          strategy === 'topk' ? 'top-k' :
-          strategy === 'hybrid' ? 'top-k+top-p' : 'greedy';
+          strategy === 'topk' ? 'top-k' : 'greedy';
         $('nextTokenStatus').textContent = `Added token (${strategyName}): ${safeTokenLabel(token)}`;
         await fetchRealDistribution();
       } catch (err) {
@@ -1741,7 +1728,6 @@
       }
     }
 
-    $('fetchDist').addEventListener('click', fetchRealDistribution);
     $('generateNextToken').addEventListener('click', generateNextToken);
     $('undoToken').addEventListener('click', undoLastToken);
     $('distPrompt').addEventListener('input', () => scheduleDistRefresh(450));
