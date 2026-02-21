@@ -115,7 +115,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         if attention_mask is not None:
             attention_mask = attention_mask.to(device)
 
-        max_tokens = max(1, min(int(max_tokens), 400))
+        max_tokens = max(1, min(int(max_tokens), 200))
         temperature = float(temperature)
         top_p = float(top_p)
         top_k = int(top_k) if top_k is not None else 0
@@ -169,7 +169,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         if attention_mask is not None:
             attention_mask = attention_mask.to(device)
 
-        max_tokens = max(1, min(int(max_tokens), 400))
+        max_tokens = max(1, min(int(max_tokens), 200))
         temperature = float(temperature)
         top_p = float(top_p)
         top_k = int(top_k) if top_k is not None else 0

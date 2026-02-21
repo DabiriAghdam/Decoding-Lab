@@ -26,6 +26,14 @@
       --shadow-sm: 0 8px 16px rgba(18, 34, 53, 0.08);
       --radius-xl: 18px;
       --radius-md: 12px;
+      --paper-bg: #ffffff;
+      --plot-bg: #f4fbf7;
+      --plot-grid: #d5e6dc;
+      --topk-line: #3e8f66;
+      --topp-line: #0057ff;
+      --bar-topp: #2f8d60cc;
+      --bar-topk: #3e8f66b0;
+      --bar-tail: #b4231844;
     }
 
     * { box-sizing: border-box; }
@@ -89,9 +97,55 @@
 
     .hero-row {
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: 1fr auto auto auto;
       gap: 10px;
       align-items: end;
+    }
+
+    body[data-theme="ocean"] {
+      --bg-0: #eef6fb;
+      --bg-1: #dfedf8;
+      --bg-2: #e8f2fa;
+      --surface: #ffffff;
+      --surface-soft: #f6fbff;
+      --ink: #152238;
+      --muted: #516683;
+      --line: #c8d9eb;
+      --brand: #2f6bcf;
+      --brand-2: #2f9acf;
+      --accent: #2f7dcf;
+      --paper-bg: #ffffff;
+      --plot-bg: #f6fbff;
+      --plot-grid: #d8e6f5;
+      --topk-line: #2f9acf;
+      --topp-line: #1c4eb7;
+      --bar-topp: #2f6bcfcc;
+      --bar-topk: #2f9acfb0;
+      --bar-tail: #b4231844;
+    }
+
+    body[data-theme="night"] {
+      --bg-0: #0d151b;
+      --bg-1: #0f1c26;
+      --bg-2: #11202b;
+      --surface: #111d27;
+      --surface-soft: #152532;
+      --ink: #e8f3ff;
+      --muted: #9eb3c7;
+      --line: #2d485a;
+      --brand: #4ba97a;
+      --brand-2: #6dd0a0;
+      --accent: #64c497;
+      --paper-bg: #111d27;
+      --plot-bg: #0f1a23;
+      --plot-grid: #284153;
+      --topk-line: #64c497;
+      --topp-line: #56a0ff;
+      --bar-topp: #4ba97acc;
+      --bar-topk: #64c497b0;
+      --bar-tail: #f8717148;
+      --shadow-lg: none;
+      --shadow-sm: none;
     }
 
     .field { display: grid; gap: 6px; }
@@ -212,6 +266,38 @@
     }
 
     .status.error { color: var(--danger); }
+
+    body[data-theme="night"] input[type="text"],
+    body[data-theme="night"] textarea,
+    body[data-theme="night"] select,
+    body[data-theme="night"] button {
+      background: #10202b;
+      border-color: #2d485a;
+      color: var(--ink);
+    }
+
+    body[data-theme="night"] .hero {
+      background: linear-gradient(110deg, #13222e 0%, #152633 58%, #162b37 100%);
+    }
+
+    body[data-theme="night"] .tab-btn {
+      background: #11202b;
+      color: var(--ink);
+    }
+
+    body[data-theme="night"] .mono,
+    body[data-theme="night"] #tailChart {
+      background: #0f1a23;
+      border-color: #2d485a;
+    }
+
+    body[data-theme="night"] .metric,
+    body[data-theme="night"] .kpi,
+    body[data-theme="night"] .chip {
+      background: #18303d;
+      border-color: #335365;
+      color: #d8f3e7;
+    }
 
     .chip {
       display: inline-flex;
@@ -398,6 +484,14 @@
             <option value="TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T">TinyLlama-1.1B</option>
           </select>
         </div>
+        <div class="field">
+          <label for="themeSelect">Theme</label>
+          <select id="themeSelect">
+            <option value="forest" selected>Forest Light</option>
+            <option value="ocean">Ocean Light</option>
+            <option value="night">Night Mode</option>
+          </select>
+        </div>
         <button id="preloadModel">Preload Model</button>
         <button id="testConn">Test Backend</button>
       </div>
@@ -463,7 +557,7 @@
 
             <div class="field">
               <label for="aMaxTokens">Max Tokens: <span id="aMaxTokensVal">120</span></label>
-              <input id="aMaxTokens" type="range" min="20" max="320" step="10" value="120" />
+              <input id="aMaxTokens" type="range" min="20" max="200" step="10" value="120" />
             </div>
 
             <div class="field">
@@ -511,7 +605,7 @@
 
             <div class="field">
               <label for="bMaxTokens">Max Tokens: <span id="bMaxTokensVal">120</span></label>
-              <input id="bMaxTokens" type="range" min="20" max="320" step="10" value="120" />
+              <input id="bMaxTokens" type="range" min="20" max="200" step="10" value="120" />
             </div>
 
             <div class="field">
@@ -548,7 +642,7 @@
           <div style="display:grid;gap:8px;">
             <div class="chip">Blind decoding preference arena</div>
             <div class="arena-score">
-              Round <span id="roundNum">1</span>/5 · Score <span id="scoreNum">0</span>
+              Round <span id="roundNum">1</span>/5 · Selections <span id="scoreNum">0</span>
               <span id="roundResult" style="margin-left:8px;"></span>
             </div>
           </div>
@@ -682,6 +776,18 @@
 
     function apiConfig() {
       return { model: $('model').value.trim() || 'gpt2-large' };
+    }
+
+    function applyTheme(theme) {
+      const normalized = (theme || 'forest').toLowerCase();
+      if (normalized === 'forest') {
+        document.body.removeAttribute('data-theme');
+      } else {
+        document.body.setAttribute('data-theme', normalized);
+      }
+      try {
+        localStorage.setItem('decoding_theme', normalized);
+      } catch (_) {}
     }
 
     function strategyLabel(v) {
@@ -981,6 +1087,7 @@
         fetchRealDistribution();
       }
     });
+    $('themeSelect').addEventListener('change', () => applyTheme($('themeSelect').value));
 
     $('testConn').addEventListener('click', async () => {
       const connStatus = $('connStatus');
@@ -1052,7 +1159,12 @@
     let score = 0;
     let leftMethod = 'Top-p (Nucleus)';
     let rightMethod = 'Greedy';
-    let targetMethod = 'Top-p (Nucleus)';
+    const methodWins = {
+      'Greedy': 0,
+      'Top-k': 0,
+      'Top-p (Nucleus)': 0,
+      'Top-k + Top-p': 0,
+    };
 
     function arenaPairConfigs(prompt) {
       const pair = $('arenaPair').value;
@@ -1127,8 +1239,6 @@
       const second = leftIsPrimary ? pair.right : pair.left;
       leftMethod = leftIsPrimary ? pair.leftName : pair.rightName;
       rightMethod = leftIsPrimary ? pair.rightName : pair.leftName;
-      targetMethod = pair.targetName;
-
       try {
         const outFirst = await localChatStream(
           first,
@@ -1162,13 +1272,17 @@
 
     function evaluatePick(pickedLeft) {
       const guess = pickedLeft ? leftMethod : rightMethod;
-      const correct = guess === targetMethod;
-      if (correct) score += 1;
+      methodWins[guess] = (methodWins[guess] || 0) + 1;
+      score += 1;
+      const winner = Object.entries(methodWins).sort((a, b) => b[1] - a[1])[0];
 
       $('scoreNum').textContent = String(score);
-      $('roundResult').textContent = correct ? 'Correct pick.' : 'Not this one.';
-      $('roundResult').className = correct ? 'result-ok' : 'result-bad';
-      $('revealBox').innerHTML = `Left uses <strong>${leftMethod}</strong> | Right uses <strong>${rightMethod}</strong>`;
+      $('roundResult').textContent = `You picked ${guess} as more human-like.`;
+      $('roundResult').className = 'result-ok';
+      $('revealBox').innerHTML =
+        `Left uses <strong>${leftMethod}</strong> | Right uses <strong>${rightMethod}</strong><br>` +
+        `Current winner: <strong>${winner[0]}</strong> (${winner[1]} votes) · ` +
+        `Greedy ${methodWins['Greedy']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']} | Hybrid ${methodWins['Top-k + Top-p']}`;
     }
 
     $('pickLeft').addEventListener('click', () => evaluatePick(true));
@@ -1219,6 +1333,16 @@
         return;
       }
 
+      const css = getComputedStyle(document.body);
+      const plotBg = css.getPropertyValue('--plot-bg').trim() || '#f4fbf7';
+      const paperBg = css.getPropertyValue('--paper-bg').trim() || '#ffffff';
+      const plotGrid = css.getPropertyValue('--plot-grid').trim() || '#d5e6dc';
+      const topKLine = css.getPropertyValue('--topk-line').trim() || '#3e8f66';
+      const topPLine = css.getPropertyValue('--topp-line').trim() || '#0057ff';
+      const barTopP = css.getPropertyValue('--bar-topp').trim() || '#2f8d60cc';
+      const barTopK = css.getPropertyValue('--bar-topk').trim() || '#3e8f66b0';
+      const barTail = css.getPropertyValue('--bar-tail').trim() || '#b4231844';
+
       const probs = distTokens.map((t) => t.prob);
       const kRaw = Number($('kCut').value);
       const pCut = Number($('pCut').value);
@@ -1236,8 +1360,8 @@
             showarrow: false,
             text: 'No distribution loaded yet.'
           }],
-          paper_bgcolor: '#ffffff',
-          plot_bgcolor: '#f4fbf7'
+          paper_bgcolor: paperBg,
+          plot_bgcolor: plotBg
         }, { displayModeBar: true, responsive: true });
         $('nucleusLen').textContent = '0';
         $('topkLen').textContent = '0';
@@ -1271,7 +1395,7 @@
           `Top-k: ${inTopK ? 'yes' : 'no'}`,
           `Top-p: ${inTopP ? 'yes' : 'no'}`,
         ].join('<br>'));
-        color.push(inTopP ? '#2f8d60cc' : inTopK ? '#3e8f66b0' : '#b4231844');
+        color.push(inTopP ? barTopP : inTopK ? barTopK : barTail);
       }
 
       const tickStep = Math.max(1, Math.ceil(x.length / 24));
@@ -1283,6 +1407,7 @@
       }
 
       const yMax = Math.max(...y) * 1.12;
+      const topPBoundaryX = Math.abs(pLen - k) < 1 ? (pLen + 0.62) : (pLen + 0.5);
 
       Plotly.react(
         tailChartEl,
@@ -1296,8 +1421,9 @@
         }],
         {
           margin: { l: 78, r: 20, t: 28, b: 110 },
-          paper_bgcolor: '#ffffff',
-          plot_bgcolor: '#f4fbf7',
+          paper_bgcolor: paperBg,
+          plot_bgcolor: plotBg,
+          clickmode: 'event+select',
           xaxis: {
             title: 'Token Rank (hover for exact token labels)',
             tickmode: 'array',
@@ -1309,7 +1435,7 @@
           yaxis: {
             title: 'Probability (%)',
             rangemode: 'tozero',
-            gridcolor: '#d5e6dc',
+            gridcolor: plotGrid,
           },
           shapes: [
             {
@@ -1318,15 +1444,15 @@
               x1: k + 0.5,
               y0: 0,
               y1: yMax,
-              line: { color: '#3e8f66', width: 2, dash: 'dash' },
+              line: { color: topKLine, width: 2, dash: 'dash' },
             },
             {
               type: 'line',
-              x0: pLen + 0.5,
-              x1: pLen + 0.5,
+              x0: topPBoundaryX,
+              x1: topPBoundaryX,
               y0: 0,
               y1: yMax,
-              line: { color: '#24784f', width: 2, dash: 'dot' },
+              line: { color: topPLine, width: 5, dash: 'solid' },
             },
           ],
           annotations: [
@@ -1338,11 +1464,11 @@
               font: { size: 11, color: '#2f7d57' },
             },
             {
-              x: pLen + 0.5,
+              x: topPBoundaryX,
               y: yMax,
               text: `Top-p region (n=${pLen})`,
               showarrow: false,
-              font: { size: 11, color: '#24784f' },
+              font: { size: 12, color: topPLine },
             },
           ],
           hoverlabel: {
@@ -1356,6 +1482,7 @@
           modeBarButtonsToRemove: ['lasso2d', 'select2d'],
         }
       );
+      bindChartTokenSelect();
 
       const entropy = renorm.reduce((acc, p) => (p > 0 ? acc - p * Math.log2(p) : acc), 0);
       $('nucleusLen').textContent = String(pLen);
@@ -1451,7 +1578,6 @@
 
     $('fetchDist').addEventListener('click', fetchRealDistribution);
     $('generateNextToken').addEventListener('click', generateNextToken);
-    bindChartTokenSelect();
     $('kCut').addEventListener('input', drawDistribution);
     $('pCut').addEventListener('input', drawDistribution);
     $('distN').addEventListener('change', fetchRealDistribution);
@@ -1459,6 +1585,13 @@
 
     updateSampleTitle('a');
     updateSampleTitle('b');
+    try {
+      const savedTheme = localStorage.getItem('decoding_theme') || 'forest';
+      $('themeSelect').value = savedTheme;
+      applyTheme(savedTheme);
+    } catch (_) {
+      applyTheme('forest');
+    }
     $('arenaStatus').textContent = 'Ready.';
     $('distStatus').textContent = 'Ready.';
 
