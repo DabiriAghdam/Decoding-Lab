@@ -551,6 +551,7 @@
               <label for="aStrategy">Decoding Strategy</label>
               <select id="aStrategy">
                 <option value="greedy">Greedy</option>
+                <option value="beam">Beam-ish</option>
                 <option value="topk">Top-k</option>
                 <option value="topp" selected>Top-p (Nucleus)</option>
                 <option value="hybrid">Top-k + Top-p</option>
@@ -599,6 +600,7 @@
               <label for="bStrategy">Decoding Strategy</label>
               <select id="bStrategy">
                 <option value="greedy" selected>Greedy</option>
+                <option value="beam">Beam-ish</option>
                 <option value="topk">Top-k</option>
                 <option value="topp">Top-p (Nucleus)</option>
                 <option value="hybrid">Top-k + Top-p</option>
@@ -654,14 +656,17 @@
               <label for="arenaPair">Method Pair</label>
               <select id="arenaPair">
                 <option value="topp_vs_greedy">Top-p vs Greedy</option>
+                <option value="beam_vs_greedy">Beam-ish vs Greedy</option>
                 <option value="topk_vs_greedy">Top-k vs Greedy</option>
                 <option value="hybrid_vs_greedy">Top-k+Top-p vs Greedy</option>
                 <option value="topp_vs_topk">Top-p vs Top-k</option>
+                <option value="beam_vs_topp">Beam-ish vs Top-p</option>
               </select>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
               <button id="genRound" class="primary">Generate Round</button>
               <button id="nextRound">Next Round</button>
+              <button id="restartArena">Restart</button>
             </div>
           </div>
         </div>
@@ -739,22 +744,17 @@
             <label for="nextTokenStrategy">Next Token Strategy</label>
             <select id="nextTokenStrategy">
               <option value="greedy">Greedy</option>
+              <option value="beam">Beam-ish</option>
               <option value="topk">Top-k</option>
               <option value="topp" selected>Top-p (Nucleus)</option>
               <option value="hybrid">Top-k + Top-p</option>
+              <option value="chart_click">Chart Click (Selected Token)</option>
             </select>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <button id="fetchDist" class="primary">Refresh Distribution</button>
             <button id="generateNextToken">Generate Next Token</button>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <select id="chartClickMode">
-              <option value="append" selected>Chart Click: Append Token</option>
-              <option value="select">Chart Click: Select Token</option>
-            </select>
-            <button id="applySelectedToken">Use Selected Token</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <button id="undoToken">Undo Last Token</button>
@@ -807,6 +807,7 @@
 
     function strategyLabel(v) {
       if (v === 'greedy') return 'Greedy';
+      if (v === 'beam') return 'Beam-ish';
       if (v === 'topk') return 'Top-k';
       if (v === 'hybrid') return 'Top-k + Top-p';
       return 'Top-p (Nucleus)';
@@ -814,6 +815,7 @@
 
     function strategyShort(cfg) {
       if (cfg.strategy === 'greedy') return 'deterministic';
+      if (cfg.strategy === 'beam') return 'low-T + narrow p';
       if (cfg.strategy === 'topk') return `k=${cfg.top_k}, T=${cfg.temperature.toFixed(2)}`;
       if (cfg.strategy === 'topp') return `p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
       return `k=${cfg.top_k}, p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
@@ -889,6 +891,11 @@
       if (cfg.strategy === 'greedy') {
         body.temperature = 0;
         body.top_p = 1;
+        return body;
+      }
+      if (cfg.strategy === 'beam') {
+        body.temperature = 0.2;
+        body.top_p = 0.35;
         return body;
       }
       if (cfg.strategy === 'topk') {
@@ -1176,10 +1183,15 @@
 
     let round = 0;
     let score = 0;
+    const MAX_ARENA_ROUNDS = 5;
+    let arenaRound = 0;
+    let roundPicked = false;
+    let arenaFinished = false;
     let leftMethod = 'Top-p (Nucleus)';
     let rightMethod = 'Greedy';
     const methodWins = {
       'Greedy': 0,
+      'Beam-ish': 0,
       'Top-k': 0,
       'Top-p (Nucleus)': 0,
       'Top-k + Top-p': 0,
@@ -1209,6 +1221,16 @@
         max_tokens: 90,
         stream: true,
       };
+      const beam = {
+        model,
+        prompt,
+        strategy: 'beam',
+        temperature: 0.2,
+        top_k: 0,
+        top_p: 0.35,
+        max_tokens: 90,
+        stream: true,
+      };
       const topk = {
         model,
         prompt,
@@ -1233,8 +1255,14 @@
       if (pair === 'topk_vs_greedy') {
         return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy', targetName: 'Top-k' };
       }
+      if (pair === 'beam_vs_greedy') {
+        return { left: beam, right: greedy, leftName: 'Beam-ish', rightName: 'Greedy', targetName: 'Beam-ish' };
+      }
       if (pair === 'hybrid_vs_greedy') {
         return { left: hybrid, right: greedy, leftName: 'Top-k + Top-p', rightName: 'Greedy', targetName: 'Top-k + Top-p' };
+      }
+      if (pair === 'beam_vs_topp') {
+        return { left: beam, right: topp, leftName: 'Beam-ish', rightName: 'Top-p (Nucleus)', targetName: 'Beam-ish' };
       }
       if (pair === 'topp_vs_topk') {
         return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k', targetName: 'Top-p (Nucleus)' };
@@ -1243,11 +1271,15 @@
     }
 
     async function loadRound() {
+      if (arenaFinished) return;
       const prompt = arenaPrompts[round];
       const pair = arenaPairConfigs(prompt);
       const leftIsPrimary = Math.random() > 0.5;
 
-      $('roundNum').textContent = String(round + 1);
+      roundPicked = false;
+      $('pickLeft').disabled = false;
+      $('pickRight').disabled = false;
+      $('roundNum').textContent = String(arenaRound + 1);
       $('roundResult').textContent = '';
       $('revealBox').textContent = '';
       $('arenaStatus').textContent = 'Generating round...';
@@ -1290,9 +1322,13 @@
     }
 
     function evaluatePick(pickedLeft) {
+      if (arenaFinished || roundPicked) return;
       const guess = pickedLeft ? leftMethod : rightMethod;
       methodWins[guess] = (methodWins[guess] || 0) + 1;
       score += 1;
+      roundPicked = true;
+      $('pickLeft').disabled = true;
+      $('pickRight').disabled = true;
       const winner = Object.entries(methodWins).sort((a, b) => b[1] - a[1])[0];
 
       $('scoreNum').textContent = String(score);
@@ -1301,15 +1337,47 @@
       $('revealBox').innerHTML =
         `Left uses <strong>${leftMethod}</strong> | Right uses <strong>${rightMethod}</strong><br>` +
         `Current winner: <strong>${winner[0]}</strong> (${winner[1]} votes) · ` +
-        `Greedy ${methodWins['Greedy']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']} | Hybrid ${methodWins['Top-k + Top-p']}`;
+        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam-ish']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']} | Hybrid ${methodWins['Top-k + Top-p']}`;
+
+      if (arenaRound >= MAX_ARENA_ROUNDS - 1) {
+        arenaFinished = true;
+        $('nextRound').disabled = true;
+        $('genRound').disabled = true;
+        $('arenaStatus').textContent = `Finished ${MAX_ARENA_ROUNDS} rounds.`;
+        $('revealBox').innerHTML += `<br><strong>Final winner: ${winner[0]}</strong>`;
+      }
     }
 
     $('pickLeft').addEventListener('click', () => evaluatePick(true));
     $('pickRight').addEventListener('click', () => evaluatePick(false));
     $('genRound').addEventListener('click', loadRound);
     $('nextRound').addEventListener('click', () => {
+      if (arenaFinished) return;
+      if (!roundPicked) {
+        $('arenaStatus').textContent = 'Pick one option first, then go to next round.';
+        return;
+      }
+      arenaRound += 1;
+      if (arenaRound >= MAX_ARENA_ROUNDS) return;
       round = (round + 1) % arenaPrompts.length;
       loadRound();
+    });
+    $('restartArena').addEventListener('click', () => {
+      round = 0;
+      arenaRound = 0;
+      score = 0;
+      roundPicked = false;
+      arenaFinished = false;
+      Object.keys(methodWins).forEach((k) => { methodWins[k] = 0; });
+      $('scoreNum').textContent = '0';
+      $('roundNum').textContent = '1';
+      $('roundResult').textContent = '';
+      $('revealBox').textContent = '';
+      $('arenaStatus').textContent = 'Arena reset. Generate round 1.';
+      $('nextRound').disabled = false;
+      $('genRound').disabled = false;
+      $('pickLeft').disabled = false;
+      $('pickRight').disabled = false;
     });
 
     const tailChartEl = $('tailChart');
@@ -1462,33 +1530,18 @@
           shapes: [
             {
               type: 'line',
-              x0: k + 0.5,
-              x1: k + 0.5,
-              y0: 0,
-              y1: yMax,
-              line: { color: topKLine, width: 5, dash: 'solid' },
-            },
-            {
-              type: 'line',
               x0: topPBoundaryX,
               x1: topPBoundaryX,
               y0: 0,
               y1: yMax,
-              line: { color: topPLine, width: 2, dash: 'dash' },
+              line: { color: topPLine, width: 5, dash: 'solid' },
             },
           ],
           annotations: [
             {
-              x: k + 0.5,
-              y: yMax * 0.92,
-              text: 'Top-k boundary',
-              showarrow: false,
-              font: { size: 11, color: '#2f7d57' },
-            },
-            {
               x: topPBoundaryX,
               y: yMax,
-              text: `Top-p region (n=${pLen})`,
+              text: `Top-p boundary (n=${pLen})`,
               showarrow: false,
               font: { size: 12, color: topPLine },
             },
@@ -1553,24 +1606,7 @@
         if (!token) return;
         selectedChartToken = token;
         $('selectedTokenStatus').textContent = `Selected: ${safeTokenLabel(token)}`;
-        if ($('chartClickMode').value === 'append') {
-          distPromptHistory.push($('distPrompt').value);
-          $('distPrompt').value = `${$('distPrompt').value}${token}`;
-          $('nextTokenStatus').textContent = `Added token (chart click): ${safeTokenLabel(token)}`;
-          scheduleDistRefresh(200);
-        }
       });
-    }
-
-    async function applySelectedToken() {
-      if (!selectedChartToken) {
-        $('nextTokenStatus').textContent = 'Select a token from chart first.';
-        return;
-      }
-      distPromptHistory.push($('distPrompt').value);
-      $('distPrompt').value = `${$('distPrompt').value}${selectedChartToken}`;
-      $('nextTokenStatus').textContent = `Added selected token: ${safeTokenLabel(selectedChartToken)}`;
-      scheduleDistRefresh(200);
     }
 
     function undoLastToken() {
@@ -1608,6 +1644,9 @@
         if (strategy === 'greedy') {
           body.temperature = 0;
           body.top_p = 1;
+        } else if (strategy === 'beam') {
+          body.temperature = 0.2;
+          body.top_p = 0.35;
         } else if (strategy === 'topk') {
           body.temperature = temperature;
           body.top_p = 1;
@@ -1620,18 +1659,29 @@
           body.top_p = topP;
           body.top_k = topK;
         }
-        const res = await fetch('/api/local/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
-        const data = await res.json();
-        const token = data?.choices?.[0]?.text || '';
-        if (!token) throw new Error('No token returned.');
+        let token = '';
+        if (strategy === 'chart_click') {
+          token = selectedChartToken;
+          if (!token) throw new Error('Select a token from the chart first.');
+        } else {
+          const res = await fetch('/api/local/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
+          const data = await res.json();
+          token = data?.choices?.[0]?.text || '';
+          if (!token) throw new Error('No token returned.');
+        }
         distPromptHistory.push(prompt);
         $('distPrompt').value = `${prompt}${token}`;
-        const strategyName = strategy === 'topp' ? 'top-p' : strategy === 'topk' ? 'top-k' : strategy === 'hybrid' ? 'top-k+top-p' : 'greedy';
+        const strategyName =
+          strategy === 'chart_click' ? 'chart-click' :
+          strategy === 'beam' ? 'beam-ish' :
+          strategy === 'topp' ? 'top-p' :
+          strategy === 'topk' ? 'top-k' :
+          strategy === 'hybrid' ? 'top-k+top-p' : 'greedy';
         $('nextTokenStatus').textContent = `Added token (${strategyName}): ${safeTokenLabel(token)}`;
         await fetchRealDistribution();
       } catch (err) {
@@ -1643,14 +1693,8 @@
 
     $('fetchDist').addEventListener('click', fetchRealDistribution);
     $('generateNextToken').addEventListener('click', generateNextToken);
-    $('applySelectedToken').addEventListener('click', applySelectedToken);
     $('undoToken').addEventListener('click', undoLastToken);
     $('distPrompt').addEventListener('input', () => scheduleDistRefresh(450));
-    $('chartClickMode').addEventListener('change', () => {
-      $('selectedTokenStatus').textContent = $('chartClickMode').value === 'append'
-        ? 'Chart click will append token directly.'
-        : 'Chart click will only select token.';
-    });
     $('kCut').addEventListener('input', drawDistribution);
     $('pCut').addEventListener('input', drawDistribution);
     $('distN').addEventListener('change', fetchRealDistribution);
