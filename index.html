@@ -468,8 +468,8 @@
 <body>
   <div class="app">
     <header class="hero">
-      <h1 class="hero-title">Decoding Control Center</h1>
-      <p class="hero-subtitle">Interactive dashboard for side-by-side decoding, blind preference testing, and real next-token distributions.</p>
+      <h1 class="hero-title">Decoding Control Center · Neural Text Degeneration Explorer</h1>
+      <p class="hero-subtitle">Built for exploring Holtzman et al. (2019) and beyond, as a presentation dashboard for CPSC 532B.</p>
       <div class="hero-row">
         <div class="field">
           <label for="model">Model</label>
@@ -518,6 +518,8 @@
               <option value="paper_story">Paper · Once upon a time, in a small village</option>
               <option value="paper_essay">Paper · The meaning of life is</option>
               <option value="paper_news">Paper · The report found that</option>
+              <option value="paper_fig5_flat">Paper Fig 5 · She said, \" I never</option>
+              <option value="paper_fig5_peaked">Paper Fig 5 · I ate the pizza while it was still</option>
               <option value="city_billboard">Reactive city billboard story</option>
               <option value="receipt_poetry">Receipt poetry at midnight</option>
               <option value="satellite_last">Satellite final message</option>
@@ -698,6 +700,8 @@
               <option value="paper_story">Paper · Once upon a time, in a small village</option>
               <option value="paper_essay">Paper · The meaning of life is</option>
               <option value="paper_news">Paper · The report found that</option>
+              <option value="paper_fig5_flat">Paper Fig 5 · She said, \" I never</option>
+              <option value="paper_fig5_peaked">Paper Fig 5 · I ate the pizza while it was still</option>
               <option value="city_billboard">Reactive city billboard story</option>
               <option value="receipt_poetry">Receipt poetry at midnight</option>
               <option value="satellite_last">Satellite final message</option>
@@ -744,6 +748,17 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <button id="fetchDist" class="primary">Refresh Distribution</button>
             <button id="generateNextToken">Generate Next Token</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <select id="chartClickMode">
+              <option value="append" selected>Chart Click: Append Token</option>
+              <option value="select">Chart Click: Select Token</option>
+            </select>
+            <button id="applySelectedToken">Use Selected Token</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button id="undoToken">Undo Last Token</button>
+            <div id="selectedTokenStatus" class="status"></div>
           </div>
           <div id="distStatus" class="status"></div>
           <div id="nextTokenStatus" class="status"></div>
@@ -844,6 +859,8 @@
       paper_story: 'Once upon a time, in a small village',
       paper_essay: 'The meaning of life is',
       paper_news: 'The report found that',
+      paper_fig5_flat: 'She said, " I never',
+      paper_fig5_peaked: 'I ate the pizza while it was still',
       city_billboard: 'In a city where every billboard can write back, a teenager discovers',
       receipt_poetry: 'At midnight the chatbot started writing poetry on receipts, and by dawn',
       satellite_last: 'A satellite with a sense of humor sent one final message:',
@@ -1148,6 +1165,8 @@
       promptTemplates.paper_story,
       promptTemplates.paper_essay,
       promptTemplates.paper_news,
+      promptTemplates.paper_fig5_flat,
+      promptTemplates.paper_fig5_peaked,
       promptTemplates.city_billboard,
       promptTemplates.receipt_poetry,
       promptTemplates.satellite_last,
@@ -1296,7 +1315,10 @@
     const tailChartEl = $('tailChart');
     let distTokens = [];
     let distInFlight = false;
-    let chartClickBound = false;
+    let selectedChartToken = '';
+    let distPromptHistory = [];
+    let distRefreshTimer = null;
+    let pendingDistRefresh = false;
 
     function localDistributionPayload(prompt, topN) {
       return {
@@ -1444,7 +1466,7 @@
               x1: k + 0.5,
               y0: 0,
               y1: yMax,
-              line: { color: topKLine, width: 2, dash: 'dash' },
+              line: { color: topKLine, width: 5, dash: 'solid' },
             },
             {
               type: 'line',
@@ -1452,7 +1474,7 @@
               x1: topPBoundaryX,
               y0: 0,
               y1: yMax,
-              line: { color: topPLine, width: 5, dash: 'solid' },
+              line: { color: topPLine, width: 2, dash: 'dash' },
             },
           ],
           annotations: [
@@ -1491,7 +1513,10 @@
     }
 
     async function fetchRealDistribution() {
-      if (distInFlight) return;
+      if (distInFlight) {
+        pendingDistRefresh = true;
+        return;
+      }
       distInFlight = true;
       $('fetchDist').disabled = true;
       $('generateNextToken').disabled = true;
@@ -1509,21 +1534,60 @@
         $('fetchDist').disabled = false;
         $('generateNextToken').disabled = false;
         distInFlight = false;
+        if (pendingDistRefresh) {
+          pendingDistRefresh = false;
+          fetchRealDistribution();
+        }
       }
     }
 
     function bindChartTokenSelect() {
-      if (chartClickBound || typeof tailChartEl.on !== 'function') return;
+      if (typeof tailChartEl.on !== 'function') return;
+      if (typeof tailChartEl.removeAllListeners === 'function') {
+        tailChartEl.removeAllListeners('plotly_click');
+      }
       tailChartEl.on('plotly_click', async (evt) => {
         const idx = evt?.points?.[0]?.pointIndex;
         if (idx == null || !distTokens[idx]) return;
         const token = distTokens[idx].token || '';
         if (!token) return;
-        $('distPrompt').value = `${$('distPrompt').value}${token}`;
-        $('nextTokenStatus').textContent = `Added token (chart click): ${safeTokenLabel(token)}`;
-        await fetchRealDistribution();
+        selectedChartToken = token;
+        $('selectedTokenStatus').textContent = `Selected: ${safeTokenLabel(token)}`;
+        if ($('chartClickMode').value === 'append') {
+          distPromptHistory.push($('distPrompt').value);
+          $('distPrompt').value = `${$('distPrompt').value}${token}`;
+          $('nextTokenStatus').textContent = `Added token (chart click): ${safeTokenLabel(token)}`;
+          scheduleDistRefresh(200);
+        }
       });
-      chartClickBound = true;
+    }
+
+    async function applySelectedToken() {
+      if (!selectedChartToken) {
+        $('nextTokenStatus').textContent = 'Select a token from chart first.';
+        return;
+      }
+      distPromptHistory.push($('distPrompt').value);
+      $('distPrompt').value = `${$('distPrompt').value}${selectedChartToken}`;
+      $('nextTokenStatus').textContent = `Added selected token: ${safeTokenLabel(selectedChartToken)}`;
+      scheduleDistRefresh(200);
+    }
+
+    function undoLastToken() {
+      if (!distPromptHistory.length) {
+        $('nextTokenStatus').textContent = 'Nothing to undo.';
+        return;
+      }
+      $('distPrompt').value = distPromptHistory.pop();
+      $('nextTokenStatus').textContent = 'Undid last token update.';
+      scheduleDistRefresh(200);
+    }
+
+    function scheduleDistRefresh(delayMs = 350) {
+      if (distRefreshTimer) clearTimeout(distRefreshTimer);
+      distRefreshTimer = setTimeout(() => {
+        fetchRealDistribution();
+      }, delayMs);
     }
 
     async function generateNextToken() {
@@ -1565,6 +1629,7 @@
         const data = await res.json();
         const token = data?.choices?.[0]?.text || '';
         if (!token) throw new Error('No token returned.');
+        distPromptHistory.push(prompt);
         $('distPrompt').value = `${prompt}${token}`;
         const strategyName = strategy === 'topp' ? 'top-p' : strategy === 'topk' ? 'top-k' : strategy === 'hybrid' ? 'top-k+top-p' : 'greedy';
         $('nextTokenStatus').textContent = `Added token (${strategyName}): ${safeTokenLabel(token)}`;
@@ -1578,6 +1643,14 @@
 
     $('fetchDist').addEventListener('click', fetchRealDistribution);
     $('generateNextToken').addEventListener('click', generateNextToken);
+    $('applySelectedToken').addEventListener('click', applySelectedToken);
+    $('undoToken').addEventListener('click', undoLastToken);
+    $('distPrompt').addEventListener('input', () => scheduleDistRefresh(450));
+    $('chartClickMode').addEventListener('change', () => {
+      $('selectedTokenStatus').textContent = $('chartClickMode').value === 'append'
+        ? 'Chart click will append token directly.'
+        : 'Chart click will only select token.';
+    });
     $('kCut').addEventListener('input', drawDistribution);
     $('pCut').addEventListener('input', drawDistribution);
     $('distN').addEventListener('change', fetchRealDistribution);
