@@ -677,7 +677,6 @@
                 <option value="topp_vs_greedy">Top-p vs Greedy</option>
                 <option value="beam_vs_greedy">Beam Search vs Greedy</option>
                 <option value="topk_vs_greedy">Top-k vs Greedy</option>
-                <option value="hybrid_vs_greedy">Top-k+Top-p vs Greedy</option>
                 <option value="topp_vs_topk">Top-p vs Top-k</option>
                 <option value="beam_vs_topp">Beam Search vs Top-p</option>
               </select>
@@ -768,10 +767,8 @@
           <div style="display:grid;grid-template-columns:1fr;gap:8px;">
             <button id="generateNextToken">Generate Next Token</button>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <button id="undoToken">Undo Last Token</button>
-            <div id="selectedTokenStatus" class="status"></div>
-          </div>
+          <button id="undoToken">Undo Last Token</button>
+          <div id="selectedTokenStatus" class="status"></div>
           <div id="distStatus" class="status"></div>
           <div id="nextTokenStatus" class="status"></div>
 
@@ -1271,25 +1268,11 @@
         max_tokens: 90,
         stream: true,
       };
-      const hybrid = {
-        model,
-        prompt,
-        strategy: 'hybrid',
-        temperature: 0.95,
-        top_k: 40,
-        top_p: 0.90,
-        max_tokens: 90,
-        stream: true,
-      };
-
       if (pair === 'topk_vs_greedy') {
         return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy', targetName: 'Top-k' };
       }
       if (pair === 'beam_vs_greedy') {
         return { left: beam, right: greedy, leftName: 'Beam Search', rightName: 'Greedy', targetName: 'Beam Search' };
-      }
-      if (pair === 'hybrid_vs_greedy') {
-        return { left: hybrid, right: greedy, leftName: 'Top-k + Top-p', rightName: 'Greedy', targetName: 'Top-k + Top-p' };
       }
       if (pair === 'beam_vs_topp') {
         return { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)', targetName: 'Beam Search' };
@@ -1451,6 +1434,7 @@
       const topKLine = css.getPropertyValue('--topk-line').trim() || '#3e8f66';
       const topPLine = css.getPropertyValue('--topp-line').trim() || '#0057ff';
       const barTopP = css.getPropertyValue('--bar-topp').trim() || 'rgba(47, 141, 96, 0.85)';
+      const barTopK = css.getPropertyValue('--bar-topk').trim() || 'rgba(62, 143, 102, 0.70)';
       const barTail = css.getPropertyValue('--bar-tail').trim() || 'rgba(180, 35, 24, 0.28)';
 
       const probs = distTokens.map((t) => t.prob);
@@ -1505,7 +1489,7 @@
           `Top-k: ${inTopK ? 'yes' : 'no'}`,
           `Top-p: ${inTopP ? 'yes' : 'no'}`,
         ].join('<br>'));
-        color.push(inTopP ? barTopP : barTail);
+        color.push(inTopP ? barTopP : (inTopK ? barTopK : barTail));
       }
 
       const tickStep = Math.max(1, Math.ceil(x.length / 24));
