@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import math
 import os
 import threading
 import time
@@ -259,7 +260,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
             },
         }
 
-    def _next_token_distribution(self, runtime, prompt, top_n):
+    def _next_token_distribution(self, runtime, prompt, top_n, top_k=None, top_p=None):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
         device = runtime["device"]
@@ -274,14 +275,40 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         with torch.no_grad():
             logits = model(input_ids=input_ids, attention_mask=attention_mask).logits[0, -1, :]
             probs = torch.softmax(logits, dim=-1)
-            values, indices = torch.topk(probs, k=top_n)
+            sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+
+        vocab_size = int(sorted_probs.shape[0])
+        top_n = min(top_n, vocab_size)
+        top_k = max(1, min(int(top_k or 20), vocab_size))
+        top_p = float(top_p if top_p is not None else 0.9)
+        top_p = min(max(top_p, 0.01), 1.0)
+
+        cumulative = torch.cumsum(sorted_probs, dim=-1)
+        top_p_rank = int(torch.searchsorted(cumulative, torch.tensor(top_p, device=device), right=False).item() + 1)
+        top_p_rank = max(1, min(top_p_rank, vocab_size))
 
         tokens = []
-        for p, idx in zip(values.tolist(), indices.tolist()):
+        for rank in range(top_n):
+            idx = int(sorted_indices[rank].item())
+            p = float(sorted_probs[rank].item())
             token_text = tokenizer.decode([idx], clean_up_tokenization_spaces=False)
-            safe_p = max(float(p), 1e-12)
-            tokens.append({"token": token_text, "prob": safe_p, "logprob": float(torch.log(torch.tensor(safe_p)))})
-        return tokens
+            safe_p = max(p, 1e-12)
+            tokens.append(
+                {
+                    "token": token_text,
+                    "prob": safe_p,
+                    "logprob": float(math.log(safe_p)),
+                    "rank": rank + 1,
+                    "in_top_k": rank < top_k,
+                    "in_top_p": rank < top_p_rank,
+                }
+            )
+        return {
+            "tokens": tokens,
+            "top_k_rank": top_k,
+            "top_p_rank": top_p_rank,
+            "vocab_size": vocab_size,
+        }
 
     def do_OPTIONS(self):
         if self.path.startswith("/api/"):
@@ -407,12 +434,20 @@ class PresentationHandler(SimpleHTTPRequestHandler):
             model_id = _normalize_model_id(body.get("model"))
             prompt = body.get("prompt")
             top_n = body.get("top_n", 40)
+            top_k = body.get("top_k", 20)
+            top_p = body.get("top_p", 0.9)
             if not prompt:
                 self._send_json(400, {"error": "prompt is required"})
                 return
             try:
                 runtime = _load_runtime(model_id)
-                tokens = self._next_token_distribution(runtime=runtime, prompt=prompt, top_n=top_n)
+                dist = self._next_token_distribution(
+                    runtime=runtime,
+                    prompt=prompt,
+                    top_n=top_n,
+                    top_k=top_k,
+                    top_p=top_p,
+                )
                 self._send_json(
                     200,
                     {
@@ -421,8 +456,10 @@ class PresentationHandler(SimpleHTTPRequestHandler):
                         "mode": "exact_logits",
                         "model": model_id,
                         "device": runtime["device"],
-                        "tokens": tokens,
-                        "normalized_over_top_n": False,
+                        "tokens": dist["tokens"],
+                        "top_k_rank": dist["top_k_rank"],
+                        "top_p_rank": dist["top_p_rank"],
+                        "vocab_size": dist["vocab_size"],
                     },
                 )
             except Exception as exc:

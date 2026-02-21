@@ -32,9 +32,9 @@
       --plot-grid: #d5e6dc;
       --topk-line: #3e8f66;
       --topp-line: #0057ff;
-      --bar-topp: #2f8d60cc;
-      --bar-topk: #3e8f66b0;
-      --bar-tail: #b4231844;
+      --bar-topp: rgba(47, 141, 96, 0.85);
+      --bar-topk: rgba(62, 143, 102, 0.70);
+      --bar-tail: rgba(180, 35, 24, 0.28);
     }
 
     * { box-sizing: border-box; }
@@ -120,9 +120,9 @@
       --plot-grid: #d8e6f5;
       --topk-line: #2f9acf;
       --topp-line: #1c4eb7;
-      --bar-topp: #2f6bcfcc;
-      --bar-topk: #2f9acfb0;
-      --bar-tail: #b4231844;
+      --bar-topp: rgba(47, 107, 207, 0.88);
+      --bar-topk: rgba(47, 154, 207, 0.70);
+      --bar-tail: rgba(180, 35, 24, 0.28);
     }
 
     body[data-theme="night"] {
@@ -142,9 +142,9 @@
       --plot-grid: #284153;
       --topk-line: #64c497;
       --topp-line: #56a0ff;
-      --bar-topp: #4ba97acc;
-      --bar-topk: #64c497b0;
-      --bar-tail: #f8717148;
+      --bar-topp: rgba(75, 169, 122, 0.88);
+      --bar-topk: rgba(100, 196, 151, 0.70);
+      --bar-tail: rgba(248, 113, 113, 0.32);
       --shadow-lg: none;
       --shadow-sm: none;
     }
@@ -419,6 +419,16 @@
 
     .result-ok { color: var(--ok); font-weight: 800; }
     .result-bad { color: var(--danger); font-weight: 800; }
+    .winner-banner {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--brand);
+      background: rgba(36, 120, 79, 0.14);
+      font-weight: 900;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
 
     .dist-layout {
       display: grid;
@@ -552,7 +562,7 @@
               <label for="aStrategy">Decoding Strategy</label>
               <select id="aStrategy">
                 <option value="greedy">Greedy</option>
-                <option value="beam">Beam-ish</option>
+                <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp" selected>Top-p (Nucleus)</option>
                 <option value="hybrid">Top-k + Top-p</option>
@@ -606,7 +616,7 @@
               <label for="bStrategy">Decoding Strategy</label>
               <select id="bStrategy">
                 <option value="greedy" selected>Greedy</option>
-                <option value="beam">Beam-ish</option>
+                <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp">Top-p (Nucleus)</option>
                 <option value="hybrid">Top-k + Top-p</option>
@@ -667,11 +677,11 @@
               <label for="arenaPair">Method Pair</label>
               <select id="arenaPair">
                 <option value="topp_vs_greedy">Top-p vs Greedy</option>
-                <option value="beam_vs_greedy">Beam-ish vs Greedy</option>
+                <option value="beam_vs_greedy">Beam Search vs Greedy</option>
                 <option value="topk_vs_greedy">Top-k vs Greedy</option>
                 <option value="hybrid_vs_greedy">Top-k+Top-p vs Greedy</option>
                 <option value="topp_vs_topk">Top-p vs Top-k</option>
-                <option value="beam_vs_topp">Beam-ish vs Top-p</option>
+                <option value="beam_vs_topp">Beam Search vs Top-p</option>
               </select>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
@@ -750,7 +760,7 @@
             <label for="nextTokenStrategy">Next Token Strategy</label>
             <select id="nextTokenStrategy">
               <option value="greedy">Greedy</option>
-              <option value="beam">Beam-ish</option>
+              <option value="beam">Beam Search</option>
               <option value="topk">Top-k</option>
               <option value="topp" selected>Top-p (Nucleus)</option>
               <option value="hybrid">Top-k + Top-p</option>
@@ -813,7 +823,7 @@
 
     function strategyLabel(v) {
       if (v === 'greedy') return 'Greedy';
-      if (v === 'beam') return 'Beam-ish';
+      if (v === 'beam') return 'Beam Search';
       if (v === 'topk') return 'Top-k';
       if (v === 'hybrid') return 'Top-k + Top-p';
       return 'Top-p (Nucleus)';
@@ -904,7 +914,7 @@
       if (cfg.strategy === 'beam') {
         body.temperature = 0;
         body.top_p = 1;
-        body.beam_size = Math.max(1, Number(cfg.beam_size) || 1);
+        body.beam_size = Math.max(2, Number(cfg.beam_size) || 4);
         return body;
       }
       if (cfg.strategy === 'topk') {
@@ -1064,7 +1074,7 @@
       try {
         const useStream = cfg.stream && cfg.strategy !== 'beam';
         if (cfg.stream && cfg.strategy === 'beam') {
-          statusEl.textContent = 'Beam-ish runs non-streaming.';
+          statusEl.textContent = 'Beam Search runs non-streaming.';
         }
         const out = useStream
           ? await localChatStream(
@@ -1216,7 +1226,7 @@
     let rightMethod = 'Greedy';
     const methodWins = {
       'Greedy': 0,
-      'Beam-ish': 0,
+      'Beam Search': 0,
       'Top-k': 0,
       'Top-p (Nucleus)': 0,
       'Top-k + Top-p': 0,
@@ -1250,9 +1260,10 @@
         model,
         prompt,
         strategy: 'beam',
-        temperature: 0.2,
+        temperature: 0,
         top_k: 0,
-        top_p: 0.35,
+        top_p: 1,
+        beam_size: 4,
         max_tokens: 90,
         stream: true,
       };
@@ -1281,13 +1292,13 @@
         return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy', targetName: 'Top-k' };
       }
       if (pair === 'beam_vs_greedy') {
-        return { left: beam, right: greedy, leftName: 'Beam-ish', rightName: 'Greedy', targetName: 'Beam-ish' };
+        return { left: beam, right: greedy, leftName: 'Beam Search', rightName: 'Greedy', targetName: 'Beam Search' };
       }
       if (pair === 'hybrid_vs_greedy') {
         return { left: hybrid, right: greedy, leftName: 'Top-k + Top-p', rightName: 'Greedy', targetName: 'Top-k + Top-p' };
       }
       if (pair === 'beam_vs_topp') {
-        return { left: beam, right: topp, leftName: 'Beam-ish', rightName: 'Top-p (Nucleus)', targetName: 'Beam-ish' };
+        return { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)', targetName: 'Beam Search' };
       }
       if (pair === 'topp_vs_topk') {
         return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k', targetName: 'Top-p (Nucleus)' };
@@ -1348,14 +1359,14 @@
       $('revealBox').innerHTML =
         `Left uses <strong>${leftMethod}</strong> | Right uses <strong>${rightMethod}</strong><br>` +
         `Current winner: <strong>${winner[0]}</strong> (${winner[1]} votes) · ` +
-        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam-ish']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']} | Hybrid ${methodWins['Top-k + Top-p']}`;
+        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam Search']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']} | Hybrid ${methodWins['Top-k + Top-p']}`;
 
       if (arenaRound >= MAX_ARENA_ROUNDS - 1) {
         arenaFinished = true;
         $('nextRound').disabled = true;
         $('genRound').disabled = true;
         $('arenaStatus').textContent = `Finished ${MAX_ARENA_ROUNDS} rounds.`;
-        $('revealBox').innerHTML += `<br><strong>Final winner: ${winner[0]}</strong>`;
+        $('revealBox').innerHTML += `<div class="winner-banner">Final Winner: ${winner[0]}</div>`;
       }
     }
 
@@ -1385,6 +1396,8 @@
       $('roundResult').textContent = '';
       $('revealBox').textContent = '';
       $('arenaStatus').textContent = 'Arena reset. Generate round 1.';
+      $('leftText').textContent = '';
+      $('rightText').textContent = '';
       $('nextRound').disabled = false;
       $('genRound').disabled = false;
       $('pickLeft').disabled = false;
@@ -1393,6 +1406,7 @@
 
     const tailChartEl = $('tailChart');
     let distTokens = [];
+    let distMeta = { top_k_rank: 0, top_p_rank: 0, vocab_size: 0 };
     let distInFlight = false;
     let selectedChartToken = '';
     let distPromptHistory = [];
@@ -1404,6 +1418,8 @@
         model: apiConfig().model,
         prompt,
         top_n: topN,
+        top_k: Number($('kCut').value),
+        top_p: Number($('pCut').value),
       };
     }
 
@@ -1418,7 +1434,7 @@
       if (!Array.isArray(data?.tokens) || !data.tokens.length) {
         throw new Error('No token probabilities returned.');
       }
-      return data.tokens;
+      return data;
     }
 
     function safeTokenLabel(token) {
@@ -1440,9 +1456,8 @@
       const plotGrid = css.getPropertyValue('--plot-grid').trim() || '#d5e6dc';
       const topKLine = css.getPropertyValue('--topk-line').trim() || '#3e8f66';
       const topPLine = css.getPropertyValue('--topp-line').trim() || '#0057ff';
-      const barTopP = css.getPropertyValue('--bar-topp').trim() || '#2f8d60cc';
-      const barTopK = css.getPropertyValue('--bar-topk').trim() || '#3e8f66b0';
-      const barTail = css.getPropertyValue('--bar-tail').trim() || '#b4231844';
+      const barTopP = css.getPropertyValue('--bar-topp').trim() || 'rgba(47, 141, 96, 0.85)';
+      const barTail = css.getPropertyValue('--bar-tail').trim() || 'rgba(180, 35, 24, 0.28)';
 
       const probs = distTokens.map((t) => t.prob);
       const kRaw = Number($('kCut').value);
@@ -1470,7 +1485,7 @@
         return;
       }
 
-      const k = Math.min(kRaw, probs.length);
+      const k = kRaw;
       const shownMass = probs.reduce((a, b) => a + b, 0) || 1;
       const renorm = probs.map((x) => x / shownMass);
 
@@ -1480,12 +1495,12 @@
       const color = [];
 
       let cumulative = 0;
-      let pLen = 0;
+      let pLen = Number(distMeta.top_p_rank || 0);
       for (let i = 0; i < probs.length; i += 1) {
         cumulative += renorm[i];
-        if (!pLen && cumulative >= pCut) pLen = i + 1;
-        const inTopK = i < k;
-        const inTopP = i < pLen;
+        const rank = Number(distTokens[i]?.rank || i + 1);
+        const inTopK = rank <= k;
+        const inTopP = rank <= pLen;
         x.push(i + 1);
         y.push(probs[i] * 100);
         text.push([
@@ -1508,7 +1523,9 @@
       }
 
       const yMax = Math.max(...y) * 1.12;
-      const topPBoundaryX = Math.abs(pLen - k) < 1 ? (pLen + 0.62) : (pLen + 0.5);
+      const kBoundaryX = Math.min(k + 0.5, x.length + 0.5);
+      const pBoundaryX = Math.min(pLen + 0.5, x.length + 0.5);
+      const topPBoundaryX = Math.abs(pBoundaryX - kBoundaryX) < 0.2 ? (pBoundaryX + 0.18) : pBoundaryX;
 
       Plotly.react(
         tailChartEl,
@@ -1541,8 +1558,8 @@
           shapes: [
             {
               type: 'line',
-              x0: k + 0.5,
-              x1: k + 0.5,
+              x0: kBoundaryX,
+              x1: kBoundaryX,
               y0: 0,
               y1: yMax,
               line: { color: topKLine, width: 2, dash: 'dash' },
@@ -1558,16 +1575,16 @@
           ],
           annotations: [
             {
-              x: k + 0.5,
+              x: kBoundaryX,
               y: yMax * 0.92,
-              text: 'Top-k boundary',
+              text: k <= x.length ? `Top-k boundary (k=${k})` : `Top-k boundary (k=${k}, off-chart)`,
               showarrow: false,
               font: { size: 11, color: topKLine },
             },
             {
               x: topPBoundaryX,
               y: yMax,
-              text: `Top-p boundary (n=${pLen})`,
+              text: pLen <= x.length ? `Top-p boundary (n=${pLen})` : `Top-p boundary (n=${pLen}, off-chart)`,
               showarrow: false,
               font: { size: 12, color: topPLine },
             },
@@ -1604,7 +1621,13 @@
       try {
         const prompt = $('distPrompt').value.trim() || 'The report found that';
         const topN = Number($('distN').value);
-        distTokens = await fetchDistribution(prompt, topN);
+        const dist = await fetchDistribution(prompt, topN);
+        distTokens = dist.tokens;
+        distMeta = {
+          top_k_rank: Number($('kCut').value),
+          top_p_rank: Number(dist.top_p_rank || 0),
+          vocab_size: Number(dist.vocab_size || 0),
+        };
         drawDistribution();
         $('distStatus').textContent = 'Distribution loaded.';
       } catch (err) {
@@ -1671,8 +1694,9 @@
           body.temperature = 0;
           body.top_p = 1;
         } else if (strategy === 'beam') {
-          body.temperature = 0.2;
-          body.top_p = 0.35;
+          body.temperature = 0;
+          body.top_p = 1;
+          body.beam_size = 4;
         } else if (strategy === 'topk') {
           body.temperature = temperature;
           body.top_p = 1;
@@ -1704,7 +1728,7 @@
         $('distPrompt').value = `${prompt}${token}`;
         const strategyName =
           strategy === 'chart_click' ? 'chart-click' :
-          strategy === 'beam' ? 'beam-ish' :
+          strategy === 'beam' ? 'beam-search' :
           strategy === 'topp' ? 'top-p' :
           strategy === 'topk' ? 'top-k' :
           strategy === 'hybrid' ? 'top-k+top-p' : 'greedy';
@@ -1722,7 +1746,7 @@
     $('undoToken').addEventListener('click', undoLastToken);
     $('distPrompt').addEventListener('input', () => scheduleDistRefresh(450));
     $('kCut').addEventListener('input', drawDistribution);
-    $('pCut').addEventListener('input', drawDistribution);
+    $('pCut').addEventListener('input', () => scheduleDistRefresh(220));
     $('distN').addEventListener('change', fetchRealDistribution);
     window.addEventListener('resize', drawDistribution);
 
