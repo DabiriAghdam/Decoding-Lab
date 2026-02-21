@@ -388,9 +388,9 @@
         <div class="field">
           <label for="model">Model</label>
           <select id="model">
-            <option value="gpt2" selected>gpt2 (small)</option>
+            <option value="gpt2">gpt2 (small)</option>
             <option value="gpt2-medium">gpt2-medium</option>
-            <option value="gpt2-large">gpt2-large</option>
+            <option value="gpt2-large" selected>gpt2-large</option>
             <option value="gpt2-xl">gpt2-xl</option>
             <option value="distilgpt2">distilgpt2</option>
             <option value="EleutherAI/pythia-410m-deduped">EleutherAI/pythia-410m-deduped</option>
@@ -681,7 +681,7 @@
     tabs.forEach((btn) => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
 
     function apiConfig() {
-      return { model: $('model').value.trim() || 'gpt2' };
+      return { model: $('model').value.trim() || 'gpt2-large' };
     }
 
     function strategyLabel(v) {
@@ -1182,6 +1182,7 @@
     const tailChartEl = $('tailChart');
     let distTokens = [];
     let distInFlight = false;
+    let chartClickBound = false;
 
     function localDistributionPayload(prompt, topN) {
       return {
@@ -1209,7 +1210,7 @@
       return token
         .replace(/\n/g, '\\n')
         .replace(/\t/g, '\\t')
-        .replace(/ /g, '␠');
+        .replace(/ /g, '.');
     }
 
     function drawDistribution() {
@@ -1312,16 +1313,6 @@
           },
           shapes: [
             {
-              type: 'rect',
-              x0: 0.5,
-              x1: pLen + 0.5,
-              y0: 0,
-              y1: yMax,
-              line: { width: 0 },
-              fillcolor: 'rgba(36, 120, 79, 0.12)',
-              layer: 'below',
-            },
-            {
               type: 'line',
               x0: k + 0.5,
               x1: k + 0.5,
@@ -1394,6 +1385,20 @@
       }
     }
 
+    function bindChartTokenSelect() {
+      if (chartClickBound || typeof tailChartEl.on !== 'function') return;
+      tailChartEl.on('plotly_click', async (evt) => {
+        const idx = evt?.points?.[0]?.pointIndex;
+        if (idx == null || !distTokens[idx]) return;
+        const token = distTokens[idx].token || '';
+        if (!token) return;
+        $('distPrompt').value = `${$('distPrompt').value}${token}`;
+        $('nextTokenStatus').textContent = `Added token (chart click): ${safeTokenLabel(token)}`;
+        await fetchRealDistribution();
+      });
+      chartClickBound = true;
+    }
+
     async function generateNextToken() {
       if (distInFlight) return;
       $('nextTokenStatus').textContent = 'Generating next token...';
@@ -1446,6 +1451,7 @@
 
     $('fetchDist').addEventListener('click', fetchRealDistribution);
     $('generateNextToken').addEventListener('click', generateNextToken);
+    bindChartTokenSelect();
     $('kCut').addEventListener('input', drawDistribution);
     $('pCut').addEventListener('input', drawDistribution);
     $('distN').addEventListener('change', fetchRealDistribution);
