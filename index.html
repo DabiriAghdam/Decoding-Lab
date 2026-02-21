@@ -3,1145 +3,1407 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Decoding Lab: Neural Text Degeneration</title>
+  <title>Decoding Control Center</title>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap');
+
     :root {
-      --bg: #f3f7fb;
-      --bg-alt: #e8eef7;
-      --ink: #111827;
-      --accent: #0b5fc6;
-      --accent-2: #0f766e;
-      --card: #ffffff;
-      --muted: #5b677a;
-      --ok: #166534;
-      --bad: #b91c1c;
-      --ring: #0b5fc633;
+      --bg-0: #eff8f3;
+      --bg-1: #e1f0e7;
+      --bg-2: #eef7f1;
+      --surface: #ffffff;
+      --surface-soft: #f6fbf8;
+      --ink: #172133;
+      --muted: #5d697d;
+      --line: #c7dfd0;
+      --brand: #24784f;
+      --brand-2: #2f8d60;
+      --accent: #3e8f66;
+      --danger: #b42318;
+      --ok: #136c44;
+      --shadow-lg: 0 18px 32px rgba(21, 38, 62, 0.12);
+      --shadow-sm: 0 8px 16px rgba(18, 34, 53, 0.08);
+      --radius-xl: 18px;
+      --radius-md: 12px;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(1000px 500px at 100% -10%, #d5e4fb 0%, transparent 70%),
-        radial-gradient(900px 500px at 0% 110%, #d9eee8 0%, transparent 70%),
-        linear-gradient(150deg, var(--bg), var(--bg-alt));
       min-height: 100vh;
-    }
-
-    header {
-      padding: 20px 22px 14px;
-      max-width: 1100px;
-      margin: 0 auto;
-      background: #ffffffd6;
-      backdrop-filter: blur(10px);
-      border: 1px solid #cfdced;
-      border-radius: 14px;
-      margin-top: 14px;
-      box-shadow: 0 18px 38px #26374d16;
-    }
-
-    h1 {
-      margin: 0;
-      font-family: "Iowan Old Style", "Baskerville", "Times New Roman", serif;
-      letter-spacing: 0.3px;
-      font-size: clamp(1.8rem, 3vw, 2.6rem);
-    }
-
-    .subtitle {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-
-    .tabs {
-      max-width: 1100px;
-      margin: 10px auto 0;
-      padding: 0 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .tab-btn {
-      border: 1px solid #c8d7ec;
-      background: #f9fbff;
       color: var(--ink);
-      padding: 10px 16px;
-      border-radius: 12px;
-      cursor: pointer;
-      font-weight: 700;
-      transition: all 160ms ease;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px 700px at 110% -10%, #d7f0e2 0%, transparent 75%),
+        radial-gradient(1000px 520px at -8% 108%, #d9efe2 0%, transparent 70%),
+        linear-gradient(150deg, var(--bg-0), var(--bg-1));
     }
 
-    .tab-btn.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-      box-shadow: 0 6px 20px var(--ring);
-    }
-
-    .tab-btn:hover {
-      transform: translateY(-1px);
-    }
-
-    main {
-      max-width: 1100px;
-      margin: 12px auto 36px;
-      padding: 0 20px;
-    }
-
-    .panel {
-      display: none;
-      background: var(--card);
-      border: 1px solid #d8e3f0;
-      border-radius: 14px;
-      box-shadow: 0 16px 30px #1c2f4512;
-      padding: 20px;
-      animation: fade 300ms ease;
-    }
-
-    .panel.active {
-      display: block;
-    }
-
-    @keyframes fade {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .grid {
+    .app {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 18px 18px 28px;
       display: grid;
-      grid-template-columns: 320px 1fr;
       gap: 14px;
     }
 
-    .controls {
-      background: #f9fbff;
-      border: 1px solid #d7e1f0;
-      border-radius: 12px;
-      padding: 14px;
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      background:
+        linear-gradient(110deg, #ffffff 0%, #f4fbf7 58%, #ebf7f1 100%);
+      box-shadow: var(--shadow-lg);
+      padding: 18px;
+      display: grid;
+      gap: 12px;
     }
 
-    label {
-      display: block;
-      margin: 12px 0 6px;
-      font-size: 0.88rem;
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, rgba(36, 120, 79, 0.16), transparent 68%);
+      right: -130px;
+      top: -190px;
+      pointer-events: none;
+    }
+
+    .hero-title {
+      margin: 0;
+      font-family: "Fraunces", "Times New Roman", serif;
+      font-size: clamp(1.4rem, 2.8vw, 2.5rem);
+      letter-spacing: 0.01em;
+    }
+
+    .hero-subtitle {
+      margin: 0;
+      font-size: 0.95rem;
       color: var(--muted);
     }
 
-    input[type="range"], select, textarea, input[type="text"] {
-      width: 100%;
+    .hero-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: end;
     }
 
-    textarea, select, button, input[type="text"] {
-      border: 1px solid #c5d7ec;
-      border-radius: 10px;
-      background: #ffffff;
-      padding: 10px;
+    .field { display: grid; gap: 6px; }
+
+    .field label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    input[type="text"],
+    textarea,
+    select,
+    button,
+    input[type="range"] {
+      width: 100%;
+      color: var(--ink);
       font: inherit;
-      color: inherit;
+      border: 1px solid #c5d3e4;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    input[type="text"],
+    textarea,
+    select,
+    button {
+      padding: 10px 12px;
     }
 
     textarea {
-      min-height: 92px;
       resize: vertical;
+      min-height: 92px;
+      line-height: 1.42;
+    }
+
+    input[type="range"] {
+      accent-color: var(--brand);
+      padding: 0;
+      height: 30px;
+      border: 0;
+      background: transparent;
     }
 
     button {
-      cursor: pointer;
       font-weight: 700;
-      background: linear-gradient(180deg, #ffffff, #edf4ff);
-      transition: transform 160ms ease, box-shadow 160ms ease;
-    }
-
-    button.primary {
-      background: linear-gradient(180deg, #1677ff, #0b5fc6);
-      color: #fff;
-      border-color: #0b5fc6;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+      background: linear-gradient(180deg, #ffffff, #edf8f2);
     }
 
     button:hover {
       transform: translateY(-1px);
-      box-shadow: 0 10px 20px #33557f1a;
+      box-shadow: var(--shadow-sm);
     }
 
     button:disabled {
       cursor: not-allowed;
-      opacity: 0.65;
+      opacity: 0.62;
       transform: none;
       box-shadow: none;
     }
 
-    .stack > * + * {
-      margin-top: 10px;
+    .primary {
+      color: #fff;
+      border-color: var(--brand);
+      background: linear-gradient(180deg, #359969, var(--brand));
     }
 
-    .card {
-      background: #fcfdff;
-      border: 1px solid #d8e3f0;
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .tab-btn {
       border-radius: 12px;
-      padding: 12px;
+      border: 1px solid var(--line);
+      background: #f4fbf7;
+      padding: 12px 10px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
     }
 
-    .control-header {
-      display: flex;
+    .tab-btn.active {
+      border-color: var(--brand);
+      color: #fff;
+      background: linear-gradient(180deg, #359969, var(--brand));
+      box-shadow: 0 12px 24px rgba(36, 120, 79, 0.24);
+    }
+
+    .panel {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      background: var(--surface);
+      box-shadow: var(--shadow-lg);
+      padding: 14px;
+    }
+
+    .panel.active { display: block; }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
       align-items: center;
-      justify-content: space-between;
-      font-size: 0.82rem;
-      color: var(--muted);
-      padding: 6px 2px 2px;
-      border-bottom: 1px solid #e3ebf6;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
 
-    .output-grid {
+    .status {
+      min-height: 1.2em;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 500;
+    }
+
+    .status.error { color: var(--danger); }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border: 1px solid #d1e7da;
+      background: #edf9f1;
+    }
+
+    .grid-2 {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
 
+    .card {
+      border: 1px solid #d0e5d7;
+      border-radius: 14px;
+      background: var(--surface-soft);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .sample-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .sample-title {
+      margin: 0;
+      font-size: 1.03rem;
+      letter-spacing: 0.01em;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 10px;
+    }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 20px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
     .mono {
-      font-family: ui-monospace, Menlo, Consolas, monospace;
-      font-size: 0.88rem;
+      border: 1px solid #d3e4d9;
+      border-radius: 12px;
+      background: #fff;
+      padding: 12px;
+      min-height: 150px;
       white-space: pre-wrap;
-      line-height: 1.45;
+      line-height: 1.48;
+      font-size: 0.88rem;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
     }
 
     .metrics {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin-top: 8px;
     }
 
     .metric {
-      background: #edf4ff;
-      border: 1px solid #d3e2f6;
-      padding: 6px 8px;
+      border: 1px solid #d4e8dc;
+      background: #edf9f1;
       border-radius: 999px;
-      font-size: 0.8rem;
+      padding: 5px 9px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: #1f4a34;
     }
 
-    .arena {
+    .arena-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .arena-score {
+      font-size: 0.9rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .arena-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
-      margin-top: 12px;
     }
 
-    .arena button {
+    .arena-option {
       text-align: left;
-      min-height: 170px;
-    }
-
-    .arena h4 {
-      margin: 0 0 8px;
-      font-family: "Baskerville", serif;
-      font-size: 1.1rem;
-    }
-
-    .score {
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-
-    .result.ok { color: var(--ok); font-weight: 700; }
-    .result.bad { color: var(--bad); font-weight: 700; }
-
-    .chart-wrap {
+      min-height: 220px;
       display: grid;
-      grid-template-columns: 1fr 320px;
-      gap: 14px;
+      gap: 8px;
     }
 
-    .chart-surface {
-      position: relative;
+    .arena-option h4 {
+      margin: 0;
+      font-size: 0.95rem;
+      letter-spacing: 0.01em;
+    }
+
+    .result-ok { color: var(--ok); font-weight: 800; }
+    .result-bad { color: var(--danger); font-weight: 800; }
+
+    .dist-layout {
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 12px;
     }
 
     #tailChart {
       width: 100%;
-      height: 360px;
-      border: 1px solid #d8e3f0;
-      border-radius: 12px;
-      background: #ffffff;
+      height: 500px;
+      border: 1px solid #cfe2d5;
+      border-radius: 14px;
+      background: #fff;
     }
 
-    .legend {
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.5;
+    .kpis {
+      display: grid;
+      gap: 8px;
     }
 
     .kpi {
-      background: #edf4ff;
-      border: 1px solid #d3e2f6;
+      border: 1px solid #d0e4d8;
       border-radius: 10px;
-      padding: 8px;
-      margin-top: 8px;
+      padding: 8px 10px;
+      font-size: 0.84rem;
+      background: #edf9f1;
     }
 
-    .status {
-      font-size: 0.82rem;
-      color: var(--muted);
-      min-height: 1.2em;
+    .server-warning {
+      color: var(--danger);
+      font-size: 0.84rem;
+      min-height: 1.1em;
+      font-weight: 700;
     }
 
-    @media (max-width: 940px) {
-      .grid, .chart-wrap {
-        grid-template-columns: 1fr;
-      }
-      .output-grid, .arena {
-        grid-template-columns: 1fr;
-      }
+    @media (max-width: 1120px) {
+      .hero-row { grid-template-columns: 1fr; }
+      .toolbar { grid-template-columns: 1fr; }
+      .grid-2,
+      .arena-grid,
+      .dist-layout,
+      .tabs,
+      .controls { grid-template-columns: 1fr; }
+      #tailChart { height: 420px; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Decoding Lab</h1>
-    <div class="subtitle">Interactive companion for “The Curious Case of Neural Text Degeneration”</div>
-    <div id="serverWarning" class="status" style="margin-top:8px;color:#b91c1c;font-weight:700;"></div>
-  </header>
-
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="dj">Tab 1 · Decoding Lab</button>
-    <button class="tab-btn" data-tab="arena">Tab 2 · Human Judge</button>
-    <button class="tab-btn" data-tab="tail">Tab 3 · Distribution Explorer</button>
-  </div>
-
-  <main>
-    <section id="dj" class="panel active">
-      <div class="grid">
-        <div class="controls stack">
-          <div class="control-header">
-            <span>Model & Sampling Controls</span>
-            <span>Shared Sliders, Per-Sample Strategy</span>
-          </div>
-          <div>
-            <label for="model">Model ID (local Hugging Face model)</label>
-            <input id="model" type="text" value="gpt2-large" />
-          </div>
-          <button id="testConn">Test Local Backend</button>
-          <div id="connStatus" class="status"></div>
-          <div>
-            <label for="prompt">Prompt</label>
-            <textarea id="prompt">In a city where every billboard can write back, a teenager discovers</textarea>
-          </div>
-          <div>
-            <label for="promptPreset">Prompt Presets (for cleaner live demos)</label>
-            <select id="promptPreset">
-              <option value="">Keep custom prompt</option>
-              <option value="The report found that when language models are decoded greedily, they often">Paper-style analysis</option>
-              <option value="Breaking news: researchers announced that the new text generator can">News style</option>
-              <option value="Interviewer: What is nucleus sampling?\nResearcher:">Dialogue style</option>
-              <option value="In a city where every billboard can write back, a teenager discovers">Creative fiction</option>
-            </select>
-          </div>
-          <div>
-            <label for="strategyA">Sample A Strategy</label>
-            <select id="strategyA">
-              <option value="greedy">Greedy</option>
-              <option value="beam">Beam-ish (low temp)</option>
-              <option value="topk">Top-k</option>
-              <option value="topp" selected>Top-p (nucleus)</option>
-            </select>
-          </div>
-          <div>
-            <label for="strategyB">Sample B Strategy</label>
-            <select id="strategyB">
-              <option value="greedy">Greedy</option>
-              <option value="beam">Beam-ish (low temp)</option>
-              <option value="topk">Top-k</option>
-              <option value="topp" selected>Top-p (nucleus)</option>
-            </select>
-          </div>
-          <div class="legend">
-            Sliders below are shared by both samples and applied based on the selected strategy.
-          </div>
-          <div>
-            <label for="temperature">Temperature: <span id="tempVal">1.1</span></label>
-            <input id="temperature" type="range" min="0.3" max="1.6" step="0.1" value="1.1" />
-          </div>
-          <div>
-            <label for="topk">Top-k: <span id="topkVal">30</span></label>
-            <input id="topk" type="range" min="5" max="80" step="1" value="30" />
-          </div>
-          <div>
-            <label for="topp">Top-p: <span id="toppVal">0.92</span></label>
-            <input id="topp" type="range" min="0.5" max="0.98" step="0.01" value="0.92" />
-          </div>
-          <div>
-            <label for="maxTokens">Max New Tokens: <span id="maxTokensVal">120</span></label>
-            <input id="maxTokens" type="range" min="20" max="300" step="10" value="120" />
-          </div>
-          <div>
-            <label for="degenPreset">Paper Preset (degen-inspired)</label>
-            <select id="degenPreset">
-              <option value="">Keep custom params</option>
-              <option value="greedy">Greedy (degeneration-prone)</option>
-              <option value="beam">Beam-ish low-temp</option>
-              <option value="topk40">Top-k 40</option>
-              <option value="topp90">Top-p 0.90</option>
-            </select>
-          </div>
-          <div>
-            <label style="display:flex;align-items:center;gap:8px;margin:0;">
-              <input id="streamMode" type="checkbox" checked />
-              Stream Output (live token-by-token)
-            </label>
-          </div>
-          <button id="generate" class="primary">Generate Samples</button>
-          <div id="genStatus" class="status"></div>
+  <div class="app">
+    <header class="hero">
+      <h1 class="hero-title">Decoding Control Center</h1>
+      <p class="hero-subtitle">Interactive dashboard for side-by-side decoding, blind preference testing, and real next-token distributions.</p>
+      <div class="hero-row">
+        <div class="field">
+          <label for="model">Model</label>
+          <input id="model" type="text" value="gpt2-large" />
         </div>
-        <div class="stack">
-          <div class="output-grid">
-            <div class="card">
-              <strong id="sampleALabel">Sample A</strong>
-              <div id="sampleA" class="mono"></div>
-              <div id="metricsA" class="metrics"></div>
-            </div>
-            <div class="card">
-              <strong id="sampleBLabel">Sample B</strong>
-              <div id="sampleB" class="mono"></div>
-              <div id="metricsB" class="metrics"></div>
-            </div>
+        <button id="preloadModel">Preload Model</button>
+        <button id="testConn">Test Backend</button>
+      </div>
+      <div id="connStatus" class="status"></div>
+      <div id="serverWarning" class="server-warning"></div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="tab1">Tab 1</button>
+      <button class="tab-btn" data-tab="tab2">Tab 2</button>
+      <button class="tab-btn" data-tab="tab3">Tab 3</button>
+    </nav>
+
+    <section id="tab1" class="panel active">
+      <div class="card" style="margin-bottom:12px;">
+        <div class="controls">
+          <div class="field">
+            <label for="promptTemplate">Prompt Template</label>
+            <select id="promptTemplate">
+              <option value="paper_unicorn">Paper · In a shocking finding, scientists discovered</option>
+              <option value="paper_university">Paper · The university said in a statement that</option>
+              <option value="paper_city">Paper · The city council announced that</option>
+              <option value="paper_museum">Paper · The museum curator explained that</option>
+              <option value="paper_story">Paper · Once upon a time, in a small village</option>
+              <option value="paper_essay">Paper · The meaning of life is</option>
+              <option value="paper_news">Paper · The report found that</option>
+              <option value="city_billboard">Reactive city billboard story</option>
+              <option value="receipt_poetry">Receipt poetry at midnight</option>
+              <option value="satellite_last">Satellite final message</option>
+              <option value="museum_diary">Museum digitized diaries</option>
+              <option value="weather_mood">Weather report predicts moods</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sharedPrompt">Shared Prompt (used by A and B)</label>
+            <textarea id="sharedPrompt">In a city where every billboard can write back, a teenager discovers</textarea>
           </div>
         </div>
       </div>
+
+      <div class="toolbar">
+        <button id="generateBoth" class="primary">Generate Both Samples</button>
+        <div id="genStatus" class="status"></div>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <div class="sample-header">
+            <h3 id="sampleATitle" class="sample-title">Sample A · Top-p</h3>
+            <button id="generateA">Generate A</button>
+          </div>
+
+          <div class="controls">
+            <div class="field">
+              <label for="aStrategy">Decoding Strategy</label>
+              <select id="aStrategy">
+                <option value="greedy">Greedy</option>
+                <option value="topk">Top-k</option>
+                <option value="topp" selected>Top-p (Nucleus)</option>
+                <option value="hybrid">Top-k + Top-p</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="aMaxTokens">Max Tokens: <span id="aMaxTokensVal">120</span></label>
+              <input id="aMaxTokens" type="range" min="20" max="320" step="10" value="120" />
+            </div>
+
+            <div class="field">
+              <label for="aTemp">Temperature: <span id="aTempVal">1.00</span></label>
+              <input id="aTemp" type="range" min="0" max="1.8" step="0.05" value="1.00" />
+            </div>
+
+            <div class="field">
+              <label for="aTopk">Top-k: <span id="aTopkVal">40</span></label>
+              <input id="aTopk" type="range" min="1" max="120" step="1" value="40" />
+            </div>
+
+            <div class="field">
+              <label for="aTopp">Top-p: <span id="aToppVal">0.92</span></label>
+              <input id="aTopp" type="range" min="0.20" max="1.00" step="0.01" value="0.92" />
+            </div>
+
+            <label class="toggle">
+              <input id="aStream" type="checkbox" checked />
+              Stream tokens
+            </label>
+          </div>
+
+          <div id="sampleA" class="mono"></div>
+          <div id="metricsA" class="metrics"></div>
+          <div id="statusA" class="status"></div>
+        </article>
+
+        <article class="card">
+          <div class="sample-header">
+            <h3 id="sampleBTitle" class="sample-title">Sample B · Greedy</h3>
+            <button id="generateB">Generate B</button>
+          </div>
+
+          <div class="controls">
+            <div class="field">
+              <label for="bStrategy">Decoding Strategy</label>
+              <select id="bStrategy">
+                <option value="greedy" selected>Greedy</option>
+                <option value="topk">Top-k</option>
+                <option value="topp">Top-p (Nucleus)</option>
+                <option value="hybrid">Top-k + Top-p</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="bMaxTokens">Max Tokens: <span id="bMaxTokensVal">120</span></label>
+              <input id="bMaxTokens" type="range" min="20" max="320" step="10" value="120" />
+            </div>
+
+            <div class="field">
+              <label for="bTemp">Temperature: <span id="bTempVal">1.00</span></label>
+              <input id="bTemp" type="range" min="0" max="1.8" step="0.05" value="1.00" />
+            </div>
+
+            <div class="field">
+              <label for="bTopk">Top-k: <span id="bTopkVal">40</span></label>
+              <input id="bTopk" type="range" min="1" max="120" step="1" value="40" />
+            </div>
+
+            <div class="field">
+              <label for="bTopp">Top-p: <span id="bToppVal">0.92</span></label>
+              <input id="bTopp" type="range" min="0.20" max="1.00" step="0.01" value="0.92" />
+            </div>
+
+            <label class="toggle">
+              <input id="bStream" type="checkbox" checked />
+              Stream tokens
+            </label>
+          </div>
+
+          <div id="sampleB" class="mono"></div>
+          <div id="metricsB" class="metrics"></div>
+          <div id="statusB" class="status"></div>
+        </article>
+      </div>
     </section>
 
-    <section id="arena" class="panel">
+    <section id="tab2" class="panel">
       <div class="card">
-        <strong>Which sample sounds more human?</strong>
-        <div class="legend">Click either option to reveal which sampling methods were used for left and right.</div>
-        <div class="arena">
-          <button id="pickLeft">
+        <div class="arena-head">
+          <div style="display:grid;gap:8px;">
+            <div class="chip">Blind decoding preference arena</div>
+            <div class="arena-score">
+              Round <span id="roundNum">1</span>/5 · Score <span id="scoreNum">0</span>
+              <span id="roundResult" style="margin-left:8px;"></span>
+            </div>
+          </div>
+
+          <div style="display:grid;gap:8px;min-width:270px;">
+            <div class="field">
+              <label for="arenaPair">Method Pair</label>
+              <select id="arenaPair">
+                <option value="topp_vs_greedy">Top-p vs Greedy</option>
+                <option value="topk_vs_greedy">Top-k vs Greedy</option>
+                <option value="hybrid_vs_greedy">Top-k+Top-p vs Greedy</option>
+                <option value="topp_vs_topk">Top-p vs Top-k</option>
+              </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <button id="genRound" class="primary">Generate Round</button>
+              <button id="nextRound">Next Round</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="arena-grid">
+          <button id="pickLeft" class="card arena-option">
             <h4>Option Left</h4>
             <div id="leftText" class="mono"></div>
           </button>
-          <button id="pickRight">
+
+          <button id="pickRight" class="card arena-option">
             <h4>Option Right</h4>
             <div id="rightText" class="mono"></div>
           </button>
         </div>
-        <div class="score">
-          Round: <span id="roundNum">1</span>/5 |
-          Score: <span id="scoreNum">0</span>
-          <span id="roundResult" class="result"></span>
-        </div>
-        <div class="stack" style="margin-top:10px;">
-          <button id="genRound" class="primary">Generate Round Options</button>
-          <div id="arenaStatus" class="status"></div>
-          <div id="revealBox" class="legend"></div>
-          <button id="nextRound">Next Round</button>
-        </div>
+
+        <div id="arenaStatus" class="status"></div>
+        <div id="revealBox" class="status" style="font-weight:700;"></div>
       </div>
     </section>
 
-    <section id="tail" class="panel">
-      <div class="chart-wrap">
-        <div class="chart-surface">
-          <div id="tailChart" style="width:100%;height:360px;"></div>
+    <section id="tab3" class="panel">
+      <div class="dist-layout">
+        <div class="card">
+          <div id="tailChart"></div>
         </div>
-        <div class="controls stack">
-          <div>
-            <label for="distPrompt">Context Prompt (next-token distribution)</label>
+
+        <div class="card">
+          <div class="field">
+            <label for="distTemplate">Prompt Template</label>
+            <select id="distTemplate">
+              <option value="paper_unicorn">Paper · In a shocking finding, scientists discovered</option>
+              <option value="paper_university">Paper · The university said in a statement that</option>
+              <option value="paper_city">Paper · The city council announced that</option>
+              <option value="paper_museum">Paper · The museum curator explained that</option>
+              <option value="paper_story">Paper · Once upon a time, in a small village</option>
+              <option value="paper_essay">Paper · The meaning of life is</option>
+              <option value="paper_news">Paper · The report found that</option>
+              <option value="city_billboard">Reactive city billboard story</option>
+              <option value="receipt_poetry">Receipt poetry at midnight</option>
+              <option value="satellite_last">Satellite final message</option>
+              <option value="museum_diary">Museum digitized diaries</option>
+              <option value="weather_mood">Weather report predicts moods</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="distPrompt">Distribution Prompt</label>
             <textarea id="distPrompt">The report found that when language models are decoded greedily, they often</textarea>
           </div>
-          <div>
-            <label for="distN">Top candidates to request: <span id="distNVal">40</span></label>
-            <input id="distN" type="range" min="10" max="100" step="5" value="40" />
+
+          <div class="field">
+            <label for="distN">Top Candidates: <span id="distNVal">60</span></label>
+            <input id="distN" type="range" min="10" max="160" step="5" value="60" />
           </div>
-          <div>
-            <label for="kCut">Top-k overlay: <span id="kCutVal">20</span></label>
-            <input id="kCut" type="range" min="5" max="100" step="1" value="20" />
+
+          <div class="field">
+            <label for="kCut">Top-k Overlay: <span id="kCutVal">30</span></label>
+            <input id="kCut" type="range" min="1" max="160" step="1" value="30" />
           </div>
-          <div>
-            <label for="pCut">Top-p overlay: <span id="pCutVal">0.90</span></label>
-            <input id="pCut" type="range" min="0.5" max="0.98" step="0.01" value="0.9" />
+
+          <div class="field">
+            <label for="pCut">Top-p Overlay: <span id="pCutVal">0.90</span></label>
+            <input id="pCut" type="range" min="0.20" max="0.99" step="0.01" value="0.90" />
           </div>
-          <button id="fetchDist" class="primary">Refresh Distribution</button>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button id="fetchDist" class="primary">Refresh Distribution</button>
+            <button id="generateNextToken">Generate Next Token</button>
+          </div>
           <div id="distStatus" class="status"></div>
-          <div class="kpi">Nucleus length on shown candidates: <strong id="nucleusLen">0</strong> tokens</div>
-          <div class="kpi">Top-k fixed length: <strong id="topkLen">20</strong> tokens</div>
-          <div class="kpi">Entropy (shown distribution): <strong id="entropyBits">0.00</strong> bits</div>
-          <div class="legend">This tab uses exact next-token probabilities from local model logits.</div>
+          <div id="nextTokenStatus" class="status"></div>
+
+          <div class="kpis">
+            <div class="kpi">Nucleus length: <strong id="nucleusLen">0</strong></div>
+            <div class="kpi">Top-k length: <strong id="topkLen">0</strong></div>
+            <div class="kpi">Entropy: <strong id="entropyBits">0.00</strong> bits</div>
+          </div>
         </div>
       </div>
     </section>
-  </main>
+  </div>
 
   <script>
-    const tabButtons = [...document.querySelectorAll(".tab-btn")];
-    const panels = [...document.querySelectorAll(".panel")];
-    tabButtons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        tabButtons.forEach((b) => b.classList.remove("active"));
-        panels.forEach((p) => p.classList.remove("active"));
-        btn.classList.add("active");
-        document.getElementById(btn.dataset.tab).classList.add("active");
-        if (btn.dataset.tab === "tail") {
-          fetchRealDistribution();
-        }
-      });
-    });
+    const $ = (id) => document.getElementById(id);
+
+    const tabs = [...document.querySelectorAll('.tab-btn')];
+    const panels = [...document.querySelectorAll('.panel')];
+
+    function setActiveTab(tabId) {
+      tabs.forEach((b) => b.classList.toggle('active', b.dataset.tab === tabId));
+      panels.forEach((p) => p.classList.toggle('active', p.id === tabId));
+      if (tabId === 'tab3') {
+        fetchRealDistribution();
+      }
+    }
+
+    tabs.forEach((btn) => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
 
     function apiConfig() {
-      return {
-        model: document.getElementById("model").value.trim() || "gpt2-large"
-      };
+      return { model: $('model').value.trim() || 'gpt2-large' };
     }
 
     function strategyLabel(v) {
-      if (v === "greedy") return "Greedy";
-      if (v === "beam") return "Beam-ish";
-      if (v === "topk") return "Top-k";
-      return "Top-p (nucleus)";
+      if (v === 'greedy') return 'Greedy';
+      if (v === 'topk') return 'Top-k';
+      if (v === 'hybrid') return 'Top-k + Top-p';
+      return 'Top-p (Nucleus)';
     }
 
+    function strategyShort(cfg) {
+      if (cfg.strategy === 'greedy') return 'deterministic';
+      if (cfg.strategy === 'topk') return `k=${cfg.top_k}, T=${cfg.temperature.toFixed(2)}`;
+      if (cfg.strategy === 'topp') return `p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
+      return `k=${cfg.top_k}, p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
+    }
+
+    function attachRange(rangeId, valueId, formatter) {
+      const range = $(rangeId);
+      const value = $(valueId);
+      const update = () => {
+        value.textContent = formatter ? formatter(Number(range.value)) : range.value;
+      };
+      range.addEventListener('input', update);
+      update();
+    }
+
+    attachRange('aTemp', 'aTempVal', (v) => v.toFixed(2));
+    attachRange('aTopk', 'aTopkVal');
+    attachRange('aTopp', 'aToppVal', (v) => v.toFixed(2));
+    attachRange('aMaxTokens', 'aMaxTokensVal');
+    attachRange('bTemp', 'bTempVal', (v) => v.toFixed(2));
+    attachRange('bTopk', 'bTopkVal');
+    attachRange('bTopp', 'bToppVal', (v) => v.toFixed(2));
+    attachRange('bMaxTokens', 'bMaxTokensVal');
+    attachRange('distN', 'distNVal');
+    attachRange('kCut', 'kCutVal');
+    attachRange('pCut', 'pCutVal', (v) => v.toFixed(2));
+
     function mergePromptCompletion(prompt, completion) {
-      const p = (prompt || "").trim();
-      const c = (completion || "").trim();
+      const p = (prompt || '').trim();
+      const c = (completion || '').trim();
       if (!p) return c;
       if (!c) return p;
       if (c.toLowerCase().startsWith(p.toLowerCase())) return c;
       return `${p} ${c}`.trim();
     }
 
-    async function localChat({ prompt, strategy, temperature, k, p, maxTokens = 120 }) {
-      const cfg = apiConfig();
-      const body = { model: cfg.model, prompt, max_tokens: maxTokens };
+    const promptTemplates = {
+      paper_unicorn: 'In a shocking finding, scientists discovered',
+      paper_university: 'The university said in a statement that',
+      paper_city: 'The city council announced that',
+      paper_museum: 'The museum curator explained that',
+      paper_story: 'Once upon a time, in a small village',
+      paper_essay: 'The meaning of life is',
+      paper_news: 'The report found that',
+      city_billboard: 'In a city where every billboard can write back, a teenager discovers',
+      receipt_poetry: 'At midnight the chatbot started writing poetry on receipts, and by dawn',
+      satellite_last: 'A satellite with a sense of humor sent one final message:',
+      museum_diary: 'When the museum digitized every diary, historians were shocked because',
+      weather_mood: 'The AI weather report stopped predicting rain and started predicting moods.'
+    };
 
-      if (strategy === "greedy") {
-        body.temperature = 0;
-        body.top_p = 1;
-      } else if (strategy === "beam") {
-        body.temperature = 0.2;
-        body.top_p = 0.35;
-      } else if (strategy === "topk") {
-        body.temperature = temperature;
-        body.top_p = 1;
-        body.top_k = k;
-      } else {
-        body.temperature = temperature;
-        body.top_p = p;
-      }
-
-      const res = await fetch("/api/local/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`HTTP ${res.status}: ${txt.slice(0, 220)}`);
-      }
-      const data = await res.json();
-      const text = data?.choices?.[0]?.text?.trim();
-      if (!text) throw new Error("No output returned from model.");
+    function readSample(prefix) {
       return {
-        fullText: mergePromptCompletion(prompt, text),
-        completionText: text,
-        usage: data?.usage || null,
-        performance: data?.performance || null
+        prompt: ($('sharedPrompt').value || '').trim() || 'Once upon a time',
+        strategy: $(`${prefix}Strategy`).value,
+        max_tokens: Number($(`${prefix}MaxTokens`).value),
+        temperature: Number($(`${prefix}Temp`).value),
+        top_k: Number($(`${prefix}Topk`).value),
+        top_p: Number($(`${prefix}Topp`).value),
+        stream: $(`${prefix}Stream`).checked,
       };
     }
 
-    async function localDistribution({ prompt, topN }) {
-      const res = await fetch("/api/local/next-token-distribution", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: apiConfig().model,
-          prompt,
-          top_n: topN
-        })
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        if (res.status === 404) {
-          throw new Error("API route not found. Start with `conda run -n presentation python3 server.py`.");
-        }
-        throw new Error(`HTTP ${res.status}: ${txt.slice(0, 220)}`);
-      }
-      const data = await res.json();
-      if (!Array.isArray(data?.tokens) || data.tokens.length === 0) {
-        throw new Error("No token probabilities returned.");
-      }
-      return data;
-    }
-
-    async function localChatStream(
-      { prompt, strategy, temperature, k, p, maxTokens = 120 },
-      onDelta,
-      onStatus
-    ) {
-      const cfg = apiConfig();
-      const body = { model: cfg.model, prompt, max_tokens: maxTokens };
-      if (strategy === "greedy") {
+    function buildDecodePayload(cfg) {
+      const body = {
+        model: apiConfig().model,
+        prompt: cfg.prompt,
+        max_tokens: cfg.max_tokens,
+      };
+      if (cfg.strategy === 'greedy') {
         body.temperature = 0;
         body.top_p = 1;
-      } else if (strategy === "beam") {
-        body.temperature = 0.2;
-        body.top_p = 0.35;
-      } else if (strategy === "topk") {
-        body.temperature = temperature;
+        return body;
+      }
+      if (cfg.strategy === 'topk') {
+        body.temperature = cfg.temperature;
         body.top_p = 1;
-        body.top_k = k;
-      } else {
-        body.temperature = temperature;
-        body.top_p = p;
+        body.top_k = cfg.top_k;
+        return body;
       }
+      if (cfg.strategy === 'topp') {
+        body.temperature = cfg.temperature;
+        body.top_p = cfg.top_p;
+        return body;
+      }
+      body.temperature = cfg.temperature;
+      body.top_p = cfg.top_p;
+      body.top_k = cfg.top_k;
+      return body;
+    }
 
-      const res = await fetch("/api/local/completions_stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+    async function localChat(cfg) {
+      const res = await fetch('/api/local/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildDecodePayload(cfg)),
       });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`HTTP ${res.status}: ${txt.slice(0, 220)}`);
-      }
-      if (!res.body) throw new Error("Streaming response body unavailable.");
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
+      const data = await res.json();
+      const text = data?.choices?.[0]?.text || '';
+      return {
+        fullText: mergePromptCompletion(cfg.prompt, text),
+        usage: data?.usage || null,
+        performance: data?.performance || null,
+      };
+    }
+
+    async function localChatStream(cfg, onDelta, onStatus) {
+      const res = await fetch('/api/local/completions_stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildDecodePayload(cfg)),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
+      if (!res.body) throw new Error('Streaming response body unavailable.');
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
-      let completion = "";
+      let buffer = '';
+      let completion = '';
       let usage = null;
       let performance = null;
-      let sawDone = false;
+      let doneSignal = false;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+
         while (true) {
-          const splitAt = buffer.indexOf("\n\n");
+          const splitAt = buffer.indexOf('\n\n');
           if (splitAt === -1) break;
           const packet = buffer.slice(0, splitAt);
           buffer = buffer.slice(splitAt + 2);
-          const lines = packet.split("\n");
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
+
+          for (const line of packet.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
             const payload = JSON.parse(line.slice(6));
-            if (payload.type === "delta") {
-              completion += payload.text || "";
+
+            if (payload.type === 'delta') {
+              completion += payload.text || '';
               if (onDelta) onDelta(completion);
-            } else if (payload.type === "status") {
+            } else if (payload.type === 'status') {
               if (onStatus) onStatus(payload);
-            } else if (payload.type === "done") {
+            } else if (payload.type === 'done') {
               usage = payload.usage || null;
               performance = payload.performance || null;
-              sawDone = true;
-            } else if (payload.type === "error") {
-              throw new Error(payload.error || "Streaming generation failed.");
+              doneSignal = true;
+            } else if (payload.type === 'error') {
+              throw new Error(payload.error || 'Streaming generation failed.');
             }
           }
         }
-        if (sawDone) {
-          try {
-            await reader.cancel();
-          } catch (_) {}
-          return {
-            fullText: mergePromptCompletion(prompt, completion),
-            completionText: completion,
-            usage,
-            performance
-          };
+
+        if (doneSignal) {
+          try { await reader.cancel(); } catch (_) {}
+          break;
         }
       }
+
       return {
-        fullText: mergePromptCompletion(prompt, completion),
-        completionText: completion,
+        fullText: mergePromptCompletion(cfg.prompt, completion),
         usage,
-        performance
+        performance,
       };
     }
 
-    function distinctN(words, n) {
-      if (words.length < n) return 0;
-      const set = new Set();
-      for (let i = 0; i <= words.length - n; i++) {
-        set.add(words.slice(i, i + n).join("|"));
-      }
-      return set.size / (words.length - n + 1);
-    }
+    function metricPills(container, text, performance, usage) {
+      const words = text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
+      const oneGrams = new Set(words);
+      const twoGrams = new Set(words.slice(0, -1).map((w, i) => `${w}|${words[i + 1]}`));
+      const rep = words.length ? 1 - (oneGrams.size / words.length) : 0;
 
-    function repetitionRate(words) {
-      const counts = new Map();
-      words.forEach((w) => counts.set(w, (counts.get(w) || 0) + 1));
-      let repeated = 0;
-      counts.forEach((v) => { if (v > 1) repeated += v; });
-      return words.length ? repeated / words.length : 0;
-    }
-
-    function metricPills(el, text, perf = null, usage = null) {
-      const words = text.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean);
-      const d1 = distinctN(words, 1);
-      const d2 = distinctN(words, 2);
-      const rep = repetitionRate(words);
-      const extra = [];
-      if (perf?.elapsed_ms != null) {
-        extra.push(`Time ${(perf.elapsed_ms / 1000).toFixed(2)}s`);
-      }
-      if (perf?.tokens_per_second != null) {
-        extra.push(`Tok/s ${Number(perf.tokens_per_second).toFixed(1)}`);
-      }
-      if (usage?.completion_tokens != null) {
-        extra.push(`Gen toks ${usage.completion_tokens}`);
-      }
-      el.innerHTML = [
-        `Distinct-1 ${d1.toFixed(2)}`,
-        `Distinct-2 ${d2.toFixed(2)}`,
-        `Rep ${rep.toFixed(2)}`,
+      const metrics = [
+        `Distinct-1 ${(words.length ? (oneGrams.size / words.length) : 0).toFixed(2)}`,
+        `Distinct-2 ${(words.length > 1 ? (twoGrams.size / (words.length - 1)) : 0).toFixed(2)}`,
+        `Repetition ${rep.toFixed(2)}`,
         `Words ${words.length}`,
-        ...extra
-      ].map((x) => `<span class="metric">${x}</span>`).join("");
+      ];
+
+      if (performance?.elapsed_ms != null) metrics.push(`Time ${(performance.elapsed_ms / 1000).toFixed(2)}s`);
+      if (performance?.tokens_per_second != null) metrics.push(`Tok/s ${Number(performance.tokens_per_second).toFixed(1)}`);
+      if (usage?.completion_tokens != null) metrics.push(`Generated ${usage.completion_tokens}`);
+
+      container.innerHTML = metrics.map((m) => `<span class="metric">${m}</span>`).join('');
     }
 
-    const promptEl = document.getElementById("prompt");
-    const promptPresetEl = document.getElementById("promptPreset");
-    const strategyAEl = document.getElementById("strategyA");
-    const strategyBEl = document.getElementById("strategyB");
-    const tempEl = document.getElementById("temperature");
-    const topkEl = document.getElementById("topk");
-    const toppEl = document.getElementById("topp");
-    const maxTokensEl = document.getElementById("maxTokens");
-    const degenPresetEl = document.getElementById("degenPreset");
-    const streamModeEl = document.getElementById("streamMode");
-    const sampleA = document.getElementById("sampleA");
-    const sampleB = document.getElementById("sampleB");
-    const sampleALabel = document.getElementById("sampleALabel");
-    const sampleBLabel = document.getElementById("sampleBLabel");
-    const metricsA = document.getElementById("metricsA");
-    const metricsB = document.getElementById("metricsB");
-    const connStatus = document.getElementById("connStatus");
-    const genStatus = document.getElementById("genStatus");
-    const generateBtn = document.getElementById("generate");
-    const serverWarning = document.getElementById("serverWarning");
-
-    function syncLabels() {
-      document.getElementById("tempVal").textContent = tempEl.value;
-      document.getElementById("topkVal").textContent = topkEl.value;
-      document.getElementById("toppVal").textContent = Number(toppEl.value).toFixed(2);
-      document.getElementById("maxTokensVal").textContent = maxTokensEl.value;
+    function updateSampleTitle(prefix) {
+      const cfg = readSample(prefix);
+      const label = strategyLabel(cfg.strategy);
+      const detail = strategyShort(cfg);
+      $(`sample${prefix.toUpperCase()}Title`).textContent = `Sample ${prefix.toUpperCase()} · ${label} (${detail})`;
     }
 
-    async function runGeneration() {
-      const baseConfig = {
-        prompt: promptEl.value.trim() || "Once upon a time",
-        temperature: Number(tempEl.value),
-        k: Number(topkEl.value),
-        p: Number(toppEl.value),
-        maxTokens: Number(maxTokensEl.value)
-      };
-      const configA = { ...baseConfig, strategy: strategyAEl.value };
-      const configB = { ...baseConfig, strategy: strategyBEl.value };
-      sampleALabel.textContent = `Sample A - ${strategyLabel(configA.strategy)}`;
-      sampleBLabel.textContent = `Sample B - ${strategyLabel(configB.strategy)}`;
-      sampleA.textContent = "Generating...";
-      sampleB.textContent = "Generating...";
-      metricsA.innerHTML = "";
-      metricsB.innerHTML = "";
-      genStatus.textContent = "Generating with local transformers...";
-      generateBtn.disabled = true;
+    ['aStrategy', 'aTemp', 'aTopk', 'aTopp'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('a')));
+    ['bStrategy', 'bTemp', 'bTopk', 'bTopp'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('b')));
+    $('aStrategy').addEventListener('change', () => updateSampleTitle('a'));
+    $('bStrategy').addEventListener('change', () => updateSampleTitle('b'));
+
+    const genStatusEl = $('genStatus');
+
+    async function runSingle(prefix, fromBatch = false) {
+      const cfg = readSample(prefix);
+      const outputEl = $(`sample${prefix.toUpperCase()}`);
+      const metricsEl = $(`metrics${prefix.toUpperCase()}`);
+      const statusEl = $(`status${prefix.toUpperCase()}`);
+      const button = $(`generate${prefix.toUpperCase()}`);
+
+      updateSampleTitle(prefix);
+      outputEl.textContent = 'Generating...';
+      metricsEl.innerHTML = '';
+      statusEl.textContent = 'Generating...';
+      statusEl.classList.remove('error');
+
+      if (!fromBatch) button.disabled = true;
+
       try {
-        let a;
-        let b;
-        if (streamModeEl.checked) {
-          genStatus.textContent = "Streaming Sample A...";
-          sampleA.textContent = baseConfig.prompt;
-          a = await localChatStream(
-            configA,
-            (partial) => {
-              sampleA.textContent = mergePromptCompletion(baseConfig.prompt, partial);
-            },
-            (status) => {
-              if (status?.message === "loading_runtime") {
-                genStatus.textContent = "Loading model/runtime for streaming...";
-              } else if (status?.message === "runtime_ready") {
-                genStatus.textContent = `Streaming Sample A... (${status.device})`;
+        const out = cfg.stream
+          ? await localChatStream(
+              cfg,
+              (partial) => {
+                outputEl.textContent = mergePromptCompletion(cfg.prompt, partial);
+              },
+              (status) => {
+                if (status?.message === 'loading_runtime') statusEl.textContent = 'Loading runtime...';
+                if (status?.message === 'runtime_ready') statusEl.textContent = `Running on ${status.device || 'device'}...`;
               }
-            }
-          );
-          metricPills(metricsA, a.fullText, a.performance, a.usage);
+            )
+          : await localChat(cfg);
 
-          genStatus.textContent = "Streaming Sample B...";
-          sampleB.textContent = baseConfig.prompt;
-          b = await localChatStream(configB, (partial) => {
-            sampleB.textContent = mergePromptCompletion(baseConfig.prompt, partial);
-          });
-          metricPills(metricsB, b.fullText, b.performance, b.usage);
-        } else {
-          [a, b] = await Promise.all([
-            localChat(configA),
-            localChat(configB)
-          ]);
-          sampleA.textContent = a.fullText;
-          sampleB.textContent = b.fullText;
-          metricPills(metricsA, a.fullText, a.performance, a.usage);
-          metricPills(metricsB, b.fullText, b.performance, b.usage);
-        }
-        sampleA.textContent = a.fullText;
-        sampleB.textContent = b.fullText;
-        genStatus.textContent = "Done.";
+        outputEl.textContent = out.fullText;
+        metricPills(metricsEl, out.fullText, out.performance, out.usage);
+        statusEl.textContent = 'Done.';
+        return out;
       } catch (err) {
-        sampleA.textContent = "Generation failed.";
-        sampleB.textContent = "Generation failed.";
-        genStatus.textContent = `Error: ${err.message}`;
+        statusEl.textContent = `Failed: ${err.message}`;
+        statusEl.classList.add('error');
+        throw err;
       } finally {
-        generateBtn.disabled = false;
+        if (!fromBatch) button.disabled = false;
       }
     }
 
-    [tempEl, topkEl, toppEl, maxTokensEl].forEach((el) => el.addEventListener("input", syncLabels));
-    degenPresetEl.addEventListener("change", () => {
-      const v = degenPresetEl.value;
-      if (!v) return;
-      if (v === "greedy") {
-        strategyAEl.value = "greedy";
-        strategyBEl.value = "greedy";
-        tempEl.value = "0.3";
-        toppEl.value = "0.98";
-      } else if (v === "beam") {
-        strategyAEl.value = "beam";
-        strategyBEl.value = "beam";
-        tempEl.value = "0.2";
-        toppEl.value = "0.35";
-      } else if (v === "topk40") {
-        strategyAEl.value = "topk";
-        strategyBEl.value = "topk";
-        topkEl.value = "40";
-        tempEl.value = "1.0";
-        toppEl.value = "0.98";
-      } else if (v === "topp90") {
-        strategyAEl.value = "topp";
-        strategyBEl.value = "topp";
-        toppEl.value = "0.90";
-        tempEl.value = "1.0";
-      }
-      syncLabels();
-    });
-    promptPresetEl.addEventListener("change", () => {
-      if (promptPresetEl.value) promptEl.value = promptPresetEl.value;
-    });
-    generateBtn.addEventListener("click", () => { runGeneration(); });
-    document.getElementById("testConn").addEventListener("click", async () => {
-      connStatus.textContent = "Testing...";
+    async function runBoth() {
+      genStatusEl.textContent = 'Running both samples...';
+      $('generateBoth').disabled = true;
+      $('generateA').disabled = true;
+      $('generateB').disabled = true;
+
+      const aCfg = readSample('a');
+      const bCfg = readSample('b');
+
       try {
-        const cfg = apiConfig();
-        const res = await fetch("/api/local/health", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: cfg.model, preload: true })
+        if (!aCfg.stream && !bCfg.stream) {
+          await Promise.all([runSingle('a', true), runSingle('b', true)]);
+        } else {
+          await runSingle('a', true);
+          await runSingle('b', true);
+        }
+        genStatusEl.textContent = 'Both samples updated.';
+      } catch (err) {
+        genStatusEl.textContent = `Failed: ${err.message}`;
+      } finally {
+        $('generateBoth').disabled = false;
+        $('generateA').disabled = false;
+        $('generateB').disabled = false;
+      }
+    }
+
+    $('generateA').addEventListener('click', () => runSingle('a'));
+    $('generateB').addEventListener('click', () => runSingle('b'));
+    $('generateBoth').addEventListener('click', runBoth);
+    $('promptTemplate').addEventListener('change', () => {
+      const key = $('promptTemplate').value;
+      if (promptTemplates[key]) {
+        $('sharedPrompt').value = promptTemplates[key];
+        genStatusEl.textContent = 'Template applied to shared prompt.';
+      }
+    });
+    $('distTemplate').addEventListener('change', () => {
+      const key = $('distTemplate').value;
+      if (promptTemplates[key]) {
+        $('distPrompt').value = promptTemplates[key];
+        $('nextTokenStatus').textContent = 'Template applied to distribution prompt.';
+      }
+    });
+
+    $('testConn').addEventListener('click', async () => {
+      const connStatus = $('connStatus');
+      connStatus.textContent = 'Testing backend...';
+      try {
+        const res = await fetch('/api/local/health', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: apiConfig().model }),
         });
         if (!res.ok) throw new Error(await res.text());
         const payload = await res.json();
-        connStatus.textContent = `Ready on ${payload.device || "cpu"} (loaded in ${payload.loaded_in_s || "?"}s).`;
+        connStatus.textContent = payload.loaded
+          ? `Backend ready (${payload.model})`
+          : `Backend reachable (${payload.model}), model not loaded yet`;
       } catch (err) {
         connStatus.textContent = `Connection failed: ${err.message}`;
       }
     });
-    syncLabels();
-    genStatus.textContent = "Ready.";
+
+    $('preloadModel').addEventListener('click', async () => {
+      const connStatus = $('connStatus');
+      connStatus.textContent = 'Preloading model...';
+      try {
+        const res = await fetch('/api/local/health', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: apiConfig().model, preload: true }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const payload = await res.json();
+        connStatus.textContent = `Loaded on ${payload.device || 'device'} in ${payload.loaded_in_s || '?'}s`;
+      } catch (err) {
+        connStatus.textContent = `Preload failed: ${err.message}`;
+      }
+    });
 
     async function checkApiServer() {
       try {
-        const res = await fetch("/api/local/health", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: apiConfig().model })
+        const res = await fetch('/api/local/health', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: apiConfig().model }),
         });
-        if (res.status === 404) {
-          serverWarning.textContent = "Wrong server: run `conda run -n presentation python3 server.py`.";
-          return;
-        }
-        serverWarning.textContent = "";
+        $('serverWarning').textContent = res.status === 404
+          ? 'Wrong server detected. Start the local backend server in this folder.'
+          : '';
       } catch (_) {
-        serverWarning.textContent = "";
+        $('serverWarning').textContent = '';
       }
     }
-    checkApiServer();
 
-    const arenaData = [
-      "At midnight the chatbot started writing poetry on receipts.",
-      "A satellite with a sense of humor sent one final message:",
-      "The town replaced streetlights with tiny language models.",
-      "When the museum digitized every diary,",
-      "The AI weather report stopped predicting rain and started predicting moods."
+    const arenaPrompts = [
+      promptTemplates.paper_unicorn,
+      promptTemplates.paper_university,
+      promptTemplates.paper_city,
+      promptTemplates.paper_museum,
+      promptTemplates.paper_story,
+      promptTemplates.paper_essay,
+      promptTemplates.paper_news,
+      promptTemplates.city_billboard,
+      promptTemplates.receipt_poetry,
+      promptTemplates.satellite_last,
+      promptTemplates.museum_diary,
+      promptTemplates.weather_mood,
     ];
 
     let round = 0;
     let score = 0;
-    let leftIsGood = true;
-    let leftMethod = "";
-    let rightMethod = "";
-    const leftText = document.getElementById("leftText");
-    const rightText = document.getElementById("rightText");
-    const roundNum = document.getElementById("roundNum");
-    const scoreNum = document.getElementById("scoreNum");
-    const roundResult = document.getElementById("roundResult");
-    const revealBox = document.getElementById("revealBox");
-    const arenaStatus = document.getElementById("arenaStatus");
-    const genRoundBtn = document.getElementById("genRound");
-    let currentPrompt = "";
+    let leftMethod = 'Top-p (Nucleus)';
+    let rightMethod = 'Greedy';
+    let targetMethod = 'Top-p (Nucleus)';
+
+    function arenaPairConfigs(prompt) {
+      const pair = $('arenaPair').value;
+      const model = apiConfig().model;
+
+      const greedy = {
+        model,
+        prompt,
+        strategy: 'greedy',
+        temperature: 0,
+        top_k: 40,
+        top_p: 1,
+        max_tokens: 90,
+        stream: true,
+      };
+      const topp = {
+        model,
+        prompt,
+        strategy: 'topp',
+        temperature: 0.95,
+        top_k: 40,
+        top_p: 0.92,
+        max_tokens: 90,
+        stream: true,
+      };
+      const topk = {
+        model,
+        prompt,
+        strategy: 'topk',
+        temperature: 0.95,
+        top_k: 40,
+        top_p: 1,
+        max_tokens: 90,
+        stream: true,
+      };
+      const hybrid = {
+        model,
+        prompt,
+        strategy: 'hybrid',
+        temperature: 0.95,
+        top_k: 40,
+        top_p: 0.90,
+        max_tokens: 90,
+        stream: true,
+      };
+
+      if (pair === 'topk_vs_greedy') {
+        return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy', targetName: 'Top-k' };
+      }
+      if (pair === 'hybrid_vs_greedy') {
+        return { left: hybrid, right: greedy, leftName: 'Top-k + Top-p', rightName: 'Greedy', targetName: 'Top-k + Top-p' };
+      }
+      if (pair === 'topp_vs_topk') {
+        return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k', targetName: 'Top-p (Nucleus)' };
+      }
+      return { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy', targetName: 'Top-p (Nucleus)' };
+    }
 
     async function loadRound() {
-      currentPrompt = arenaData[round];
-      leftIsGood = Math.random() > 0.5;
-      leftText.textContent = "Generating option...";
-      rightText.textContent = "Generating option...";
-      roundNum.textContent = String(round + 1);
-      scoreNum.textContent = String(score);
-      roundResult.textContent = "";
-      roundResult.className = "result";
-      revealBox.textContent = "";
-      arenaStatus.textContent = `Generating round ${round + 1} options locally...`;
-      genRoundBtn.disabled = true;
+      const prompt = arenaPrompts[round];
+      const pair = arenaPairConfigs(prompt);
+      const leftIsPrimary = Math.random() > 0.5;
+
+      $('roundNum').textContent = String(round + 1);
+      $('roundResult').textContent = '';
+      $('revealBox').textContent = '';
+      $('arenaStatus').textContent = 'Generating round...';
+      $('leftText').textContent = 'Generating...';
+      $('rightText').textContent = 'Generating...';
+
+      const first = leftIsPrimary ? pair.left : pair.right;
+      const second = leftIsPrimary ? pair.right : pair.left;
+      leftMethod = leftIsPrimary ? pair.leftName : pair.rightName;
+      rightMethod = leftIsPrimary ? pair.rightName : pair.leftName;
+      targetMethod = pair.targetName;
+
       try {
-        arenaStatus.textContent = `Streaming round ${round + 1} options...`;
-        const good = await localChatStream(
-          {
-            prompt: currentPrompt,
-            strategy: "topp",
-            temperature: Math.max(Number(tempEl.value), 0.7),
-            k: Number(topkEl.value),
-            p: Math.max(Number(toppEl.value), 0.9),
-            maxTokens: Math.min(Number(maxTokensEl.value), 120)
-          },
+        const outFirst = await localChatStream(
+          first,
           (partial) => {
-            const txt = `${currentPrompt} ${partial}`.trim();
-            if (leftIsGood) leftText.textContent = txt;
-            else rightText.textContent = txt;
+            if (leftIsPrimary) $('leftText').textContent = mergePromptCompletion(prompt, partial);
+            else $('rightText').textContent = mergePromptCompletion(prompt, partial);
           }
         );
-        const bad = await localChatStream(
-          {
-            prompt: currentPrompt,
-            strategy: "greedy",
-            temperature: Number(tempEl.value),
-            k: Number(topkEl.value),
-            p: Number(toppEl.value),
-            maxTokens: Math.min(Number(maxTokensEl.value), 120)
-          },
+
+        const outSecond = await localChatStream(
+          second,
           (partial) => {
-            const txt = `${currentPrompt} ${partial}`.trim();
-            if (leftIsGood) rightText.textContent = txt;
-            else leftText.textContent = txt;
+            if (leftIsPrimary) $('rightText').textContent = mergePromptCompletion(prompt, partial);
+            else $('leftText').textContent = mergePromptCompletion(prompt, partial);
           }
         );
-        leftText.textContent = leftIsGood ? good.fullText : bad.fullText;
-        rightText.textContent = leftIsGood ? bad.fullText : good.fullText;
-        leftMethod = leftIsGood ? "Top-p (nucleus)" : "Greedy";
-        rightMethod = leftIsGood ? "Greedy" : "Top-p (nucleus)";
-        arenaStatus.textContent = "Round ready. Ask the audience to vote.";
+
+        if (leftIsPrimary) {
+          $('leftText').textContent = outFirst.fullText;
+          $('rightText').textContent = outSecond.fullText;
+        } else {
+          $('leftText').textContent = outSecond.fullText;
+          $('rightText').textContent = outFirst.fullText;
+        }
+
+        $('arenaStatus').textContent = 'Round ready.';
       } catch (err) {
-        leftText.textContent = "Generation failed.";
-        rightText.textContent = "Generation failed.";
-        arenaStatus.textContent = `Round generation failed: ${err.message}`;
-      } finally {
-        genRoundBtn.disabled = false;
+        $('arenaStatus').textContent = `Failed: ${err.message}`;
       }
     }
 
     function evaluatePick(pickedLeft) {
-      const correct = pickedLeft === leftIsGood;
-      if (correct) score++;
-      scoreNum.textContent = String(score);
-      roundResult.textContent = correct ? "  Correct pick." : "  Not this one.";
-      roundResult.className = `result ${correct ? "ok" : "bad"}`;
-      revealBox.innerHTML = `Left: <strong>${leftMethod}</strong> | Right: <strong>${rightMethod}</strong>`;
+      const guess = pickedLeft ? leftMethod : rightMethod;
+      const correct = guess === targetMethod;
+      if (correct) score += 1;
+
+      $('scoreNum').textContent = String(score);
+      $('roundResult').textContent = correct ? 'Correct pick.' : 'Not this one.';
+      $('roundResult').className = correct ? 'result-ok' : 'result-bad';
+      $('revealBox').innerHTML = `Left uses <strong>${leftMethod}</strong> | Right uses <strong>${rightMethod}</strong>`;
     }
 
-    document.getElementById("pickLeft").addEventListener("click", () => evaluatePick(true));
-    document.getElementById("pickRight").addEventListener("click", () => evaluatePick(false));
-    genRoundBtn.addEventListener("click", () => { loadRound(); });
-    document.getElementById("nextRound").addEventListener("click", () => {
-      round = (round + 1) % arenaData.length;
+    $('pickLeft').addEventListener('click', () => evaluatePick(true));
+    $('pickRight').addEventListener('click', () => evaluatePick(false));
+    $('genRound').addEventListener('click', loadRound);
+    $('nextRound').addEventListener('click', () => {
+      round = (round + 1) % arenaPrompts.length;
       loadRound();
     });
-    arenaStatus.textContent = "Ready.";
 
-    const tailChartEl = document.getElementById("tailChart");
-    const distPromptEl = document.getElementById("distPrompt");
-    const distNEl = document.getElementById("distN");
-    const fetchDistBtn = document.getElementById("fetchDist");
-    const distStatus = document.getElementById("distStatus");
-    const kCutEl = document.getElementById("kCut");
-    const pCutEl = document.getElementById("pCut");
-    const distNVal = document.getElementById("distNVal");
-    const kCutVal = document.getElementById("kCutVal");
-    const pCutVal = document.getElementById("pCutVal");
-    const nucleusLen = document.getElementById("nucleusLen");
-    const topkLen = document.getElementById("topkLen");
-    const entropyBits = document.getElementById("entropyBits");
-
+    const tailChartEl = $('tailChart');
     let distTokens = [];
-    function tokenLabel(token) {
-      return token
-        .replace(/\n/g, "\\n")
-        .replace(/\t/g, "\\t")
-        .replace(/ /g, "·");
+    let distInFlight = false;
+
+    function localDistributionPayload(prompt, topN) {
+      return {
+        model: apiConfig().model,
+        prompt,
+        top_n: topN,
+      };
     }
 
-    function drawTailChart() {
-      if (typeof Plotly === "undefined") {
-        distStatus.textContent = "Plotly failed to load. Check internet access, then refresh.";
+    async function fetchDistribution(prompt, topN) {
+      const res = await fetch('/api/local/next-token-distribution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(localDistributionPayload(prompt, topN)),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
+      const data = await res.json();
+      if (!Array.isArray(data?.tokens) || !data.tokens.length) {
+        throw new Error('No token probabilities returned.');
+      }
+      return data.tokens;
+    }
+
+    function safeTokenLabel(token) {
+      return token
+        .replace(/\n/g, '\\n')
+        .replace(/\t/g, '\\t')
+        .replace(/ /g, '·');
+    }
+
+    function drawDistribution() {
+      if (typeof Plotly === 'undefined') {
+        $('distStatus').textContent = 'Plotly failed to load. Check internet and refresh.';
         return;
       }
+
       const probs = distTokens.map((t) => t.prob);
-      const kRaw = Number(kCutEl.value);
-      const p = Number(pCutEl.value);
+      const kRaw = Number($('kCut').value);
+      const pCut = Number($('pCut').value);
+
       if (!probs.length) {
         Plotly.react(tailChartEl, [], {
-          margin: { l: 64, r: 24, t: 20, b: 60 },
-          xaxis: { title: "Token Rank" },
-          yaxis: { title: "Probability (%)", rangemode: "tozero" },
+          margin: { l: 70, r: 20, t: 24, b: 64 },
+          xaxis: { title: 'Token Rank' },
+          yaxis: { title: 'Probability (%)', rangemode: 'tozero' },
           annotations: [{
-            x: 0.5, y: 0.5, xref: "paper", yref: "paper",
-            text: "No distribution loaded yet.",
-            showarrow: false, font: { size: 16, color: "#4d5b70" }
+            x: 0.5,
+            y: 0.5,
+            xref: 'paper',
+            yref: 'paper',
+            showarrow: false,
+            text: 'No distribution loaded yet.'
           }],
-          paper_bgcolor: "#ffffff",
-          plot_bgcolor: "#fbfdff"
-        }, { displayModeBar: false, responsive: true });
-        nucleusLen.textContent = "0";
-        topkLen.textContent = String(kRaw);
-        entropyBits.textContent = "0.00";
+          paper_bgcolor: '#ffffff',
+          plot_bgcolor: '#f4fbf7'
+        }, { displayModeBar: true, responsive: true });
+        $('nucleusLen').textContent = '0';
+        $('topkLen').textContent = '0';
+        $('entropyBits').textContent = '0.00';
         return;
       }
-      const k = Math.min(kRaw, probs.length);
 
-      const shownMass = probs.reduce((a, b) => a + b, 0);
-      const renorm = shownMass > 0 ? probs.map((x) => x / shownMass) : probs;
-      let cum = 0;
+      const k = Math.min(kRaw, probs.length);
+      const shownMass = probs.reduce((a, b) => a + b, 0) || 1;
+      const renorm = probs.map((x) => x / shownMass);
+
+      const x = [];
+      const y = [];
+      const text = [];
+      const color = [];
+
+      let cumulative = 0;
       let pLen = 0;
-      for (let i = 0; i < renorm.length; i++) {
-        cum += renorm[i];
-        if (cum >= p) { pLen = i + 1; break; }
-      }
-      let cumLocal = 0;
-      const xVals = [];
-      const yVals = [];
-      const colors = [];
-      const hover = [];
-      for (let i = 0; i < probs.length; i++) {
-        xVals.push(i + 1);
-        yVals.push(probs[i] * 100);
+      for (let i = 0; i < probs.length; i += 1) {
+        cumulative += renorm[i];
+        if (!pLen && cumulative >= pCut) pLen = i + 1;
         const inTopK = i < k;
         const inTopP = i < pLen;
-        cumLocal += renorm[i];
-        if (inTopP) colors.push("#0f766ecc");
-        else if (inTopK) colors.push("#b45309aa");
-        else colors.push("#b91c1c44");
-        hover.push([
-          `Token: ${tokenLabel(distTokens[i].token)}`,
+        x.push(i + 1);
+        y.push(probs[i] * 100);
+        text.push([
+          `Token: ${safeTokenLabel(distTokens[i].token)}`,
           `Rank: ${i + 1}`,
           `Prob: ${(probs[i] * 100).toFixed(3)}%`,
-          `Cumulative: ${(cumLocal * 100).toFixed(2)}%`,
-          `In Top-k: ${inTopK ? "yes" : "no"}`,
-          `In Top-p: ${inTopP ? "yes" : "no"}`
-        ].join("<br>"));
+          `Cumulative: ${(cumulative * 100).toFixed(2)}%`,
+          `Top-k: ${inTopK ? 'yes' : 'no'}`,
+          `Top-p: ${inTopP ? 'yes' : 'no'}`,
+        ].join('<br>'));
+        color.push(inTopP ? '#2f8d60cc' : inTopK ? '#3e8f66b0' : '#b4231844');
       }
-      const tickStep = Math.max(1, Math.ceil(xVals.length / 20));
+
+      const tickStep = Math.max(1, Math.ceil(x.length / 24));
       const tickVals = [];
       const tickText = [];
-      for (let i = 0; i < xVals.length; i += tickStep) {
+      for (let i = 0; i < x.length; i += tickStep) {
         tickVals.push(i + 1);
-        tickText.push(tokenLabel(distTokens[i].token));
+        tickText.push(safeTokenLabel(distTokens[i].token));
       }
+
+      const yMax = Math.max(...y) * 1.12;
+
       Plotly.react(
         tailChartEl,
         [{
-          type: "bar",
-          x: xVals,
-          y: yVals,
-          marker: { color: colors, line: { width: 0 } },
-          hovertemplate: "%{customdata}<extra></extra>",
-          customdata: hover
+          type: 'bar',
+          x,
+          y,
+          marker: { color, line: { width: 0 } },
+          customdata: text,
+          hovertemplate: '%{customdata}<extra></extra>',
         }],
         {
-          margin: { l: 72, r: 24, t: 24, b: 88 },
-          paper_bgcolor: "#ffffff",
-          plot_bgcolor: "#fbfdff",
+          margin: { l: 78, r: 20, t: 28, b: 110 },
+          paper_bgcolor: '#ffffff',
+          plot_bgcolor: '#f4fbf7',
           xaxis: {
-            title: "Token Rank (Hover bars for labels)",
-            tickmode: "array",
+            title: 'Token Rank (hover for exact token labels)',
+            tickmode: 'array',
             tickvals: tickVals,
             ticktext: tickText,
-            tickangle: -25
+            tickangle: -24,
+            showgrid: false,
           },
-          yaxis: { title: "Probability (%)", rangemode: "tozero" },
+          yaxis: {
+            title: 'Probability (%)',
+            rangemode: 'tozero',
+            gridcolor: '#d5e6dc',
+          },
           shapes: [
             {
-              type: "line",
-              x0: k + 0.5, x1: k + 0.5, y0: 0, y1: Math.max(...yVals) * 1.05,
-              line: { color: "#b45309", dash: "dash", width: 2 }
+              type: 'line',
+              x0: k + 0.5,
+              x1: k + 0.5,
+              y0: 0,
+              y1: yMax,
+              line: { color: '#3e8f66', width: 2, dash: 'dash' },
             },
             {
-              type: "line",
-              x0: pLen + 0.5, x1: pLen + 0.5, y0: 0, y1: Math.max(...yVals) * 1.05,
-              line: { color: "#0f766e", dash: "dot", width: 2 }
-            }
+              type: 'line',
+              x0: pLen + 0.5,
+              x1: pLen + 0.5,
+              y0: 0,
+              y1: yMax,
+              line: { color: '#24784f', width: 2, dash: 'dot' },
+            },
           ],
           annotations: [
-            { x: k + 0.5, y: Math.max(...yVals) * 1.07, text: "Top-k cut", showarrow: false, font: { size: 11, color: "#8a4b00" } },
-            { x: pLen + 0.5, y: Math.max(...yVals) * 1.13, text: "Top-p cut", showarrow: false, font: { size: 11, color: "#0f766e" } }
+            {
+              x: k + 0.5,
+              y: yMax * 0.92,
+              text: 'Top-k boundary',
+              showarrow: false,
+              font: { size: 11, color: '#2f7d57' },
+            },
+            {
+              x: pLen + 0.5,
+              y: yMax,
+              text: 'Top-p boundary',
+              showarrow: false,
+              font: { size: 11, color: '#24784f' },
+            },
           ],
-          hoverlabel: { bgcolor: "#0f172a", font: { color: "#eef4ff", size: 12 } }
+          hoverlabel: {
+            bgcolor: '#121b2d',
+            font: { color: '#eef4ff', size: 12 },
+          },
         },
-        { displayModeBar: true, responsive: true }
+        {
+          displayModeBar: true,
+          responsive: true,
+          modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+        }
       );
 
-      const entropy = renorm.reduce((acc, pr) => (pr > 0 ? acc - pr * Math.log2(pr) : acc), 0);
-      distNVal.textContent = String(Number(distNEl.value));
-      kCutVal.textContent = String(kRaw);
-      pCutVal.textContent = Number(p).toFixed(2);
-      nucleusLen.textContent = String(pLen);
-      topkLen.textContent = String(k);
-      entropyBits.textContent = entropy.toFixed(2);
+      const entropy = renorm.reduce((acc, p) => (p > 0 ? acc - p * Math.log2(p) : acc), 0);
+      $('nucleusLen').textContent = String(pLen);
+      $('topkLen').textContent = String(k);
+      $('entropyBits').textContent = entropy.toFixed(2);
     }
 
     async function fetchRealDistribution() {
-      distStatus.textContent = "Fetching exact next-token probabilities from local model...";
-      fetchDistBtn.disabled = true;
+      if (distInFlight) return;
+      distInFlight = true;
+      $('fetchDist').disabled = true;
+      $('generateNextToken').disabled = true;
+      $('distStatus').textContent = 'Loading distribution...';
+
       try {
-        distTokens = await localDistribution({
-          prompt: distPromptEl.value.trim() || "The report found that",
-          topN: Number(distNEl.value)
-        });
-        const modeText = distTokens.mode === "exact_logits"
-          ? "exact logits"
-          : "distribution fallback";
-        distTokens = distTokens.tokens;
-        distStatus.textContent = `Distribution loaded using ${modeText}. Hover bars for details.`;
-        drawTailChart();
+        const prompt = $('distPrompt').value.trim() || 'The report found that';
+        const topN = Number($('distN').value);
+        distTokens = await fetchDistribution(prompt, topN);
+        drawDistribution();
+        $('distStatus').textContent = 'Distribution loaded.';
       } catch (err) {
-        distStatus.textContent = `Failed: ${err.message}`;
+        $('distStatus').textContent = `Failed: ${err.message}`;
       } finally {
-        fetchDistBtn.disabled = false;
+        $('fetchDist').disabled = false;
+        $('generateNextToken').disabled = false;
+        distInFlight = false;
       }
     }
 
-    fetchDistBtn.addEventListener("click", () => { fetchRealDistribution(); });
-    [kCutEl, pCutEl].forEach((el) => el.addEventListener("input", drawTailChart));
-    distNEl.addEventListener("input", () => {
-      distNVal.textContent = String(Number(distNEl.value));
-    });
-    promptPresetEl.addEventListener("change", () => {
-      if (promptPresetEl.value) distPromptEl.value = promptPresetEl.value;
-    });
-    window.addEventListener("resize", drawTailChart);
-    drawTailChart();
-    distStatus.textContent = "Ready.";
+    async function generateNextToken() {
+      if (distInFlight) return;
+      $('nextTokenStatus').textContent = 'Generating next token...';
+      $('generateNextToken').disabled = true;
+      try {
+        const prompt = $('distPrompt').value.trim() || 'The report found that';
+        const body = {
+          model: apiConfig().model,
+          prompt,
+          max_tokens: 1,
+          temperature: 0.9,
+          top_p: Number($('pCut').value),
+          top_k: Number($('kCut').value),
+        };
+        const res = await fetch('/api/local/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
+        const data = await res.json();
+        const token = data?.choices?.[0]?.text || '';
+        if (!token) throw new Error('No token returned.');
+        $('distPrompt').value = `${prompt}${token}`;
+        $('nextTokenStatus').textContent = `Added token: ${safeTokenLabel(token)}`;
+        await fetchRealDistribution();
+      } catch (err) {
+        $('nextTokenStatus').textContent = `Failed: ${err.message}`;
+      } finally {
+        $('generateNextToken').disabled = false;
+      }
+    }
+
+    $('fetchDist').addEventListener('click', fetchRealDistribution);
+    $('generateNextToken').addEventListener('click', generateNextToken);
+    $('kCut').addEventListener('input', drawDistribution);
+    $('pCut').addEventListener('input', drawDistribution);
+    $('distN').addEventListener('change', fetchRealDistribution);
+    window.addEventListener('resize', drawDistribution);
+
+    updateSampleTitle('a');
+    updateSampleTitle('b');
+    $('arenaStatus').textContent = 'Ready.';
+    $('distStatus').textContent = 'Ready.';
+
+    checkApiServer();
   </script>
 </body>
 </html>
