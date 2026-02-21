@@ -454,8 +454,31 @@
 
     .dist-layout {
       display: grid;
-      grid-template-columns: 1fr 350px;
       gap: 12px;
+    }
+
+    .dist-output-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .dist-readouts {
+      align-content: start;
+      gap: 10px;
+    }
+
+    .dist-controls-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+    }
+
+    .dist-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
 
     #tailChart {
@@ -491,9 +514,11 @@
       .toolbar { grid-template-columns: 1fr; }
       .grid-2,
       .arena-grid,
-      .dist-layout,
       .tabs,
       .controls { grid-template-columns: 1fr; }
+      .dist-output-grid,
+      .dist-controls-grid,
+      .dist-actions { grid-template-columns: 1fr; }
       #tailChart { height: 420px; }
     }
   </style>
@@ -591,8 +616,8 @@
             </div>
 
             <div class="field">
-              <label for="aMaxTokens">Max Tokens: <span id="aMaxTokensVal">120</span></label>
-              <input id="aMaxTokens" type="range" min="20" max="200" step="10" value="120" />
+              <label for="aMaxTokens">Max Tokens: <span id="aMaxTokensVal">100</span></label>
+              <input id="aMaxTokens" type="range" min="20" max="200" step="10" value="100" />
             </div>
 
             <div id="aTempWrap" class="field">
@@ -640,8 +665,8 @@
             </div>
 
             <div class="field">
-              <label for="bMaxTokens">Max Tokens: <span id="bMaxTokensVal">120</span></label>
-              <input id="bMaxTokens" type="range" min="20" max="200" step="10" value="120" />
+              <label for="bMaxTokens">Max Tokens: <span id="bMaxTokensVal">100</span></label>
+              <input id="bMaxTokens" type="range" min="20" max="200" step="10" value="100" />
             </div>
 
             <div id="bTempWrap" class="field">
@@ -723,10 +748,6 @@
     <section id="tab3" class="panel active">
       <div class="dist-layout">
         <div class="card">
-          <div id="tailChart"></div>
-        </div>
-
-        <div class="card">
           <div class="field">
             <label for="distTemplate">Prompt Template</label>
             <select id="distTemplate">
@@ -752,20 +773,37 @@
             <textarea id="distPrompt">The report found that when language models are decoded greedily, they often</textarea>
           </div>
 
-          <div class="field">
-            <label for="distN">Top Candidates: <span id="distNVal">60</span></label>
-            <input id="distN" type="range" min="10" max="160" step="5" value="60" />
+          <div class="dist-output-grid">
+            <div id="tailChart"></div>
+            <div class="card dist-readouts">
+              <div id="selectedTokenStatus" class="status"></div>
+              <div id="distStatus" class="status"></div>
+              <div id="nextTokenStatus" class="status"></div>
+              <div class="kpis">
+                <div class="kpi">Nucleus length: <strong id="nucleusLen">0</strong></div>
+                <div class="kpi">Top-k length: <strong id="topkLen">0</strong></div>
+                <div class="kpi">Entropy: <strong id="entropyBits">0.00</strong> bits</div>
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div class="field">
-            <label for="kCut">Top-k Overlay: <span id="kCutVal">30</span></label>
-            <input id="kCut" type="range" min="1" max="160" step="1" value="30" />
-          </div>
+        <div class="card">
+          <div class="dist-controls-grid">
+            <div class="field">
+              <label for="distN">Top Candidates: <span id="distNVal">60</span></label>
+              <input id="distN" type="range" min="10" max="160" step="5" value="60" />
+            </div>
 
-          <div class="field">
-            <label for="pCut">Top-p Overlay: <span id="pCutVal">0.90</span></label>
-            <input id="pCut" type="range" min="0.20" max="0.99" step="0.01" value="0.90" />
-          </div>
+            <div class="field">
+              <label for="kCut">Top-k Overlay: <span id="kCutVal">30</span></label>
+              <input id="kCut" type="range" min="1" max="160" step="1" value="30" />
+            </div>
+
+            <div class="field">
+              <label for="pCut">Top-p Overlay: <span id="pCutVal">0.90</span></label>
+              <input id="pCut" type="range" min="0.20" max="0.99" step="0.01" value="0.90" />
+            </div>
 
           <div class="field">
             <label for="nextTokenStrategy">Next Token Strategy</label>
@@ -777,19 +815,11 @@
               <option value="chart_click">Chart Click (Selected Token)</option>
             </select>
           </div>
-
-          <div style="display:grid;grid-template-columns:1fr;gap:8px;">
-            <button id="generateNextToken">Generate Next Token</button>
           </div>
-          <button id="undoToken">Undo Last Token</button>
-          <div id="selectedTokenStatus" class="status"></div>
-          <div id="distStatus" class="status"></div>
-          <div id="nextTokenStatus" class="status"></div>
 
-          <div class="kpis">
-            <div class="kpi">Nucleus length: <strong id="nucleusLen">0</strong></div>
-            <div class="kpi">Top-k length: <strong id="topkLen">0</strong></div>
-            <div class="kpi">Entropy: <strong id="entropyBits">0.00</strong> bits</div>
+          <div class="dist-actions">
+            <button id="generateNextToken">Generate Next Token</button>
+            <button id="undoToken">Undo Last Token</button>
           </div>
         </div>
       </div>
@@ -1172,6 +1202,8 @@
     $('preloadModel').addEventListener('click', async () => {
       const connStatus = $('connStatus');
       connStatus.textContent = 'Preloading model...';
+      drawChartMessage(`Loading model: ${apiConfig().model}...`);
+      $('distStatus').textContent = 'Waiting for model to load...';
       try {
         const res = await fetch('/api/local/health', {
           method: 'POST',
@@ -1181,6 +1213,7 @@
         if (!res.ok) throw new Error(await res.text());
         const payload = await res.json();
         connStatus.textContent = `Loaded on ${payload.device || 'device'} in ${payload.loaded_in_s || '?'}s`;
+        await fetchRealDistribution();
       } catch (err) {
         connStatus.textContent = `Preload failed: ${err.message}`;
       }
@@ -1432,6 +1465,32 @@
         .replace(/ /g, '.');
     }
 
+    function drawChartMessage(message) {
+      if (typeof Plotly === 'undefined') {
+        $('distStatus').textContent = 'Plotly failed to load. Check internet and refresh.';
+        return;
+      }
+      const css = getComputedStyle(document.body);
+      const plotBg = css.getPropertyValue('--plot-bg').trim() || '#f4fbf7';
+      const paperBg = css.getPropertyValue('--paper-bg').trim() || '#ffffff';
+      Plotly.react(tailChartEl, [], {
+        margin: { l: 70, r: 20, t: 24, b: 64 },
+        xaxis: { visible: false },
+        yaxis: { visible: false },
+        annotations: [{
+          x: 0.5,
+          y: 0.5,
+          xref: 'paper',
+          yref: 'paper',
+          showarrow: false,
+          text: message,
+          font: { size: 16 },
+        }],
+        paper_bgcolor: paperBg,
+        plot_bgcolor: plotBg,
+      }, { displayModeBar: true, responsive: true });
+    }
+
     function drawDistribution() {
       if (typeof Plotly === 'undefined') {
         $('distStatus').textContent = 'Plotly failed to load. Check internet and refresh.';
@@ -1453,21 +1512,7 @@
       const pCut = Number($('pCut').value);
 
       if (!probs.length) {
-        Plotly.react(tailChartEl, [], {
-          margin: { l: 70, r: 20, t: 24, b: 64 },
-          xaxis: { title: 'Token Rank' },
-          yaxis: { title: 'Probability (%)', rangemode: 'tozero' },
-          annotations: [{
-            x: 0.5,
-            y: 0.5,
-            xref: 'paper',
-            yref: 'paper',
-            showarrow: false,
-            text: 'No distribution loaded yet.'
-          }],
-          paper_bgcolor: paperBg,
-          plot_bgcolor: plotBg
-        }, { displayModeBar: true, responsive: true });
+        drawChartMessage('No distribution loaded yet.');
         $('nucleusLen').textContent = '0';
         $('topkLen').textContent = '0';
         $('entropyBits').textContent = '0.00';
@@ -1605,6 +1650,7 @@
       distInFlight = true;
       $('generateNextToken').disabled = true;
       $('distStatus').textContent = 'Loading distribution...';
+      drawChartMessage('Loading distribution...');
 
       try {
         const prompt = $('distPrompt').value.trim() || 'The report found that';
@@ -1744,6 +1790,7 @@
     }
     $('arenaStatus').textContent = 'Ready.';
     $('distStatus').textContent = 'Ready.';
+    drawChartMessage('Click "Preload Model" or open this tab to load distribution.');
 
     checkApiServer();
   </script>
