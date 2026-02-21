@@ -377,7 +377,7 @@
     }
 
     .compare-card {
-      grid-template-rows: auto auto 320px auto auto;
+      grid-template-rows: auto 320px auto auto auto;
       align-content: start;
     }
 
@@ -559,8 +559,8 @@
 
     <nav class="tabs">
       <button class="tab-btn active" data-tab="tab3">Distribution Explorer</button>
-      <button class="tab-btn" data-tab="tab2">Human Preference Arena</button>
       <button class="tab-btn" data-tab="tab1">Side-by-Side Decode</button>
+      <button class="tab-btn" data-tab="tab2">Human Preference Arena</button>
     </nav>
 
     <section id="tab1" class="panel">
@@ -604,6 +604,10 @@
             <button id="generateA">Generate A</button>
           </div>
 
+          <div id="sampleA" class="mono"></div>
+          <div id="metricsA" class="metrics"></div>
+          <div id="statusA" class="status"></div>
+
           <div class="controls">
             <div class="field">
               <label for="aStrategy">Decoding Strategy</label>
@@ -641,10 +645,6 @@
             </div>
 
           </div>
-
-          <div id="sampleA" class="mono"></div>
-          <div id="metricsA" class="metrics"></div>
-          <div id="statusA" class="status"></div>
         </article>
 
         <article class="card compare-card">
@@ -652,6 +652,10 @@
             <h3 id="sampleBTitle" class="sample-title">Sample B · Greedy</h3>
             <button id="generateB">Generate B</button>
           </div>
+
+          <div id="sampleB" class="mono"></div>
+          <div id="metricsB" class="metrics"></div>
+          <div id="statusB" class="status"></div>
 
           <div class="controls">
             <div class="field">
@@ -690,10 +694,6 @@
             </div>
 
           </div>
-
-          <div id="sampleB" class="mono"></div>
-          <div id="metricsB" class="metrics"></div>
-          <div id="statusB" class="status"></div>
         </article>
       </div>
     </section>
@@ -719,6 +719,10 @@
                 <option value="topp_vs_topk">Top-p vs Top-k</option>
                 <option value="beam_vs_topp">Beam Search vs Top-p</option>
               </select>
+            </div>
+            <div class="field">
+              <label for="arenaMaxTokens">Token Limit: <span id="arenaMaxTokensVal">90</span></label>
+              <input id="arenaMaxTokens" type="range" min="20" max="200" step="10" value="90" />
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
               <button id="genRound" class="primary">Generate Round</button>
@@ -792,12 +796,12 @@
           <div class="dist-controls-grid">
             <div class="field">
               <label for="distN">Top Candidates: <span id="distNVal">60</span></label>
-              <input id="distN" type="range" min="10" max="160" step="5" value="60" />
+              <input id="distN" type="range" min="10" max="320" step="5" value="60" />
             </div>
 
             <div class="field">
               <label for="kCut">Top-k Overlay: <span id="kCutVal">30</span></label>
-              <input id="kCut" type="range" min="1" max="160" step="1" value="30" />
+              <input id="kCut" type="range" min="1" max="320" step="1" value="30" />
             </div>
 
             <div class="field">
@@ -898,6 +902,7 @@
     attachRange('distN', 'distNVal');
     attachRange('kCut', 'kCutVal');
     attachRange('pCut', 'pCutVal', (v) => v.toFixed(2));
+    attachRange('arenaMaxTokens', 'arenaMaxTokensVal');
 
     function mergePromptCompletion(prompt, completion) {
       const p = (prompt || '').trim();
@@ -1270,6 +1275,7 @@
     function arenaPairConfigs(prompt) {
       const pair = $('arenaPair').value;
       const model = apiConfig().model;
+      const arenaMaxTokens = Number($('arenaMaxTokens').value);
 
       const greedy = {
         model,
@@ -1278,7 +1284,7 @@
         temperature: 0,
         top_k: 40,
         top_p: 1,
-        max_tokens: 90,
+        max_tokens: arenaMaxTokens,
         stream: true,
       };
       const topp = {
@@ -1288,7 +1294,7 @@
         temperature: 0.95,
         top_k: 40,
         top_p: 0.92,
-        max_tokens: 90,
+        max_tokens: arenaMaxTokens,
         stream: true,
       };
       const beam = {
@@ -1299,7 +1305,7 @@
         top_k: 0,
         top_p: 1,
         beam_size: 4,
-        max_tokens: 90,
+        max_tokens: arenaMaxTokens,
         stream: true,
       };
       const topk = {
@@ -1309,7 +1315,7 @@
         temperature: 0.95,
         top_k: 40,
         top_p: 1,
-        max_tokens: 90,
+        max_tokens: arenaMaxTokens,
         stream: true,
       };
       if (pair === 'topk_vs_greedy') {
