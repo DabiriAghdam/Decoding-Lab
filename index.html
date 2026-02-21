@@ -316,6 +316,7 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
+      align-items: start;
     }
 
     .card {
@@ -366,6 +367,27 @@
       line-height: 1.48;
       font-size: 0.88rem;
       font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+
+    /* Keep Tab 1 outputs stable for side-by-side comparison */
+    #sampleA, #sampleB {
+      height: 320px;
+      min-height: 320px;
+      overflow-y: auto;
+    }
+
+    .compare-card {
+      grid-template-rows: auto auto 320px auto auto;
+      align-content: start;
+    }
+
+    #metricsA, #metricsB {
+      min-height: 36px;
+      align-content: start;
+    }
+
+    #statusA, #statusB {
+      min-height: 20px;
     }
 
     .metrics {
@@ -511,12 +533,12 @@
     </header>
 
     <nav class="tabs">
-      <button class="tab-btn active" data-tab="tab1">Tab 1</button>
-      <button class="tab-btn" data-tab="tab2">Tab 2</button>
-      <button class="tab-btn" data-tab="tab3">Tab 3</button>
+      <button class="tab-btn active" data-tab="tab3">Distribution Explorer</button>
+      <button class="tab-btn" data-tab="tab2">Human Preference Arena</button>
+      <button class="tab-btn" data-tab="tab1">Side-by-Side Decode</button>
     </nav>
 
-    <section id="tab1" class="panel active">
+    <section id="tab1" class="panel">
       <div class="card" style="margin-bottom:12px;">
         <div class="controls">
           <div class="field">
@@ -551,7 +573,7 @@
       </div>
 
       <div class="grid-2">
-        <article class="card">
+        <article class="card compare-card">
           <div class="sample-header">
             <h3 id="sampleATitle" class="sample-title">Sample A · Top-p</h3>
             <button id="generateA">Generate A</button>
@@ -600,7 +622,7 @@
           <div id="statusA" class="status"></div>
         </article>
 
-        <article class="card">
+        <article class="card compare-card">
           <div class="sample-header">
             <h3 id="sampleBTitle" class="sample-title">Sample B · Greedy</h3>
             <button id="generateB">Generate B</button>
@@ -698,7 +720,7 @@
       </div>
     </section>
 
-    <section id="tab3" class="panel">
+    <section id="tab3" class="panel active">
       <div class="dist-layout">
         <div class="card">
           <div id="tailChart"></div>
