@@ -110,6 +110,16 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
         self.wfile.flush()
 
+    def _parse_decode_request(self, body, default_max_tokens=120, default_temperature=0.9):
+        return {
+            "max_tokens": body.get("max_tokens", default_max_tokens),
+            "temperature": body.get("temperature", default_temperature),
+            "top_p": body.get("top_p", 1.0),
+            "top_k": body.get("top_k"),
+            "beam_size": body.get("beam_size", 1),
+            "strategy": body.get("strategy"),
+        }
+
     def _normalize_decoding_params(self, strategy, temperature, top_p, top_k, beam_size):
         strategy = (strategy or "").strip().lower()
         normalized = {
@@ -161,6 +171,39 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
 
         return normalized
 
+    def _build_hf_generate_kwargs(self, tokenizer, max_tokens, decoding, streamer=None):
+        kwargs = {
+            "max_new_tokens": max_tokens,
+            "pad_token_id": tokenizer.pad_token_id,
+        }
+        if streamer is not None:
+            kwargs["streamer"] = streamer
+
+        if decoding["strategy"] == "beam":
+            kwargs.update(
+                {
+                    "do_sample": False,
+                    "num_beams": decoding["beam_size"],
+                    "early_stopping": True,
+                }
+            )
+            return kwargs
+
+        if decoding["strategy"] in {"topk", "topp", "sample"}:
+            kwargs.update(
+                {
+                    "do_sample": True,
+                    "temperature": decoding["temperature"],
+                    # Explicitly set both to avoid GenerationConfig defaults (e.g., top_k=50).
+                    "top_k": decoding["top_k"],
+                    "top_p": decoding["top_p"],
+                }
+            )
+            return kwargs
+
+        kwargs["do_sample"] = False
+        return kwargs
+
     def _generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1, strategy=None):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
@@ -180,30 +223,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             top_k=top_k,
             beam_size=beam_size,
         )
-        gen_kwargs = {
-            "max_new_tokens": max_tokens,
-            "pad_token_id": tokenizer.pad_token_id,
-        }
-        if decoding["strategy"] == "beam":
-            gen_kwargs.update(
-                {
-                    "do_sample": False,
-                    "num_beams": decoding["beam_size"],
-                    "early_stopping": True,
-                }
-            )
-        elif decoding["strategy"] in {"topk", "topp", "sample"}:
-            gen_kwargs.update(
-                {
-                    "do_sample": True,
-                    "temperature": decoding["temperature"],
-                    # Explicitly set both to avoid GenerationConfig defaults (e.g., top_k=50).
-                    "top_k": decoding["top_k"],
-                    "top_p": decoding["top_p"],
-                }
-            )
-        else:
-            gen_kwargs.update({"do_sample": False})
+        gen_kwargs = self._build_hf_generate_kwargs(tokenizer, max_tokens, decoding)
 
         started = time.perf_counter()
         with torch.inference_mode():
@@ -250,33 +270,9 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False,
         )
-        gen_kwargs = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "max_new_tokens": max_tokens,
-            "pad_token_id": tokenizer.pad_token_id,
-            "streamer": streamer,
-        }
-        if decoding["strategy"] == "beam":
-            gen_kwargs.update(
-                {
-                    "do_sample": False,
-                    "num_beams": decoding["beam_size"],
-                    "early_stopping": True,
-                }
-            )
-        elif decoding["strategy"] in {"topk", "topp", "sample"}:
-            gen_kwargs.update(
-                {
-                    "do_sample": True,
-                    "temperature": decoding["temperature"],
-                    # Explicitly set both to avoid GenerationConfig defaults (e.g., top_k=50).
-                    "top_k": decoding["top_k"],
-                    "top_p": decoding["top_p"],
-                }
-            )
-        else:
-            gen_kwargs["do_sample"] = False
+        gen_kwargs = self._build_hf_generate_kwargs(tokenizer, max_tokens, decoding, streamer=streamer)
+        gen_kwargs["input_ids"] = input_ids
+        gen_kwargs["attention_mask"] = attention_mask
 
         produced = []
         worker_error = {}
@@ -423,6 +419,8 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         sorted_probs, sorted_idx = torch.sort(probs, descending=True)
         cumulative = torch.cumsum(sorted_probs, dim=-1)
         remove_mask = cumulative > p
+        # Keep the first token above threshold so nucleus mass is >= p.
+        remove_mask[1:] = remove_mask[:-1].clone()
         remove_mask[0] = False
         filtered = sorted_probs.masked_fill(remove_mask, 0.0)
         denom = torch.sum(filtered)
@@ -686,15 +684,11 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
 
             try:
                 runtime = _load_runtime(model_id)
+                params = self._parse_decode_request(body)
                 gen = self._generate(
                     runtime=runtime,
                     prompt=prompt,
-                    max_tokens=body.get("max_tokens", 120),
-                    temperature=body.get("temperature", 0.9),
-                    top_p=body.get("top_p", 1.0),
-                    top_k=body.get("top_k"),
-                    beam_size=body.get("beam_size", 1),
-                    strategy=body.get("strategy"),
+                    **params,
                 )
                 payload = {
                     "id": f"local-{int(time.time() * 1000)}",
@@ -729,6 +723,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             self._send_sse({"type": "status", "message": "loading_runtime"})
             try:
                 runtime = _load_runtime(model_id)
+                params = self._parse_decode_request(body)
                 self._send_sse(
                     {
                         "type": "status",
@@ -739,12 +734,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                 for event in self._stream_generate(
                     runtime=runtime,
                     prompt=prompt,
-                    max_tokens=body.get("max_tokens", 120),
-                    temperature=body.get("temperature", 0.9),
-                    top_p=body.get("top_p", 1.0),
-                    top_k=body.get("top_k"),
-                    beam_size=body.get("beam_size", 1),
-                    strategy=body.get("strategy"),
+                    **params,
                 ):
                     self._send_sse(event)
                 self.close_connection = True
