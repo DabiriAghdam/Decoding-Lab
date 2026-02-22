@@ -167,7 +167,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             normalized["top_k"] = 0
             normalized["beam_size"] = 1
         else:  # sample
-            normalized["temperature"] = max(normalized["temperature"], 0.05)
+            normalized["temperature"] = max(normalized["temperature"], 0.0)
             normalized["top_p"] = 1.0
             normalized["top_k"] = 0
             normalized["beam_size"] = 1
@@ -193,6 +193,10 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             return kwargs
 
         if decoding["strategy"] in {"topk", "topp", "sample"}:
+            # In the limit temp->0, pure sampling should match greedy behavior.
+            if decoding["strategy"] == "sample" and decoding["temperature"] <= 0.0001:
+                kwargs["do_sample"] = False
+                return kwargs
             kwargs.update(
                 {
                     "do_sample": True,
@@ -267,6 +271,37 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             top_k=top_k,
             beam_size=beam_size,
         )
+
+        if decoding["strategy"] == "beam":
+            # HF streamer + beam search may not emit incremental deltas reliably.
+            gen_kwargs = self._build_hf_generate_kwargs(tokenizer, max_tokens, decoding)
+            gen_kwargs["input_ids"] = input_ids
+            gen_kwargs["attention_mask"] = attention_mask
+
+            started = time.perf_counter()
+            with torch.inference_mode():
+                output = model.generate(**gen_kwargs)
+            elapsed_s = max(time.perf_counter() - started, 1e-6)
+            new_ids = output[0][input_ids.shape[1] :]
+            completion_text = tokenizer.decode(new_ids, skip_special_tokens=True)
+            completion_tokens = int(new_ids.shape[0])
+            prompt_tokens = int(input_ids.shape[1])
+
+            if completion_text:
+                yield {"type": "delta", "text": completion_text}
+            yield {
+                "type": "done",
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": prompt_tokens + completion_tokens,
+                },
+                "performance": {
+                    "elapsed_ms": int(round(elapsed_s * 1000)),
+                    "tokens_per_second": float(completion_tokens / elapsed_s) if completion_tokens > 0 else 0.0,
+                },
+            }
+            return
 
         streamer = TextIteratorStreamer(
             tokenizer,
@@ -401,6 +436,8 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         if strategy not in ALLOWED_SAMPLING_STRATEGIES:
             raise ValueError("Unsupported strategy")
         if strategy == "greedy":
+            return int(torch.argmax(logits).item())
+        if strategy == "sample" and float(temperature) <= 0.0001:
             return int(torch.argmax(logits).item())
 
         temp = max(float(temperature), 0.05)
