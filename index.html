@@ -111,11 +111,33 @@
       color: var(--muted);
     }
 
+    .hero-note {
+      margin: 0;
+      padding: 8px 10px;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      font-size: 0.84rem;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.55);
+      max-width: 760px;
+    }
+
     .hero-row {
       display: grid;
-      grid-template-columns: 1fr auto auto auto;
+      grid-template-columns: auto auto auto;
       gap: 10px;
       align-items: end;
+      justify-content: start;
+    }
+
+    .model-compact {
+      min-width: 250px;
+      max-width: 280px;
+    }
+
+    .model-compact select {
+      font-size: 0.92rem;
+      padding: 8px 10px;
     }
 
     body[data-theme="ocean"] {
@@ -302,6 +324,10 @@
 
     body[data-theme="night"] .hero {
       background: linear-gradient(110deg, #13222e 0%, #152633 58%, #162b37 100%);
+    }
+
+    body[data-theme="night"] .hero-note {
+      background: rgba(17, 32, 43, 0.65);
     }
 
     body[data-theme="night"] .tab-btn {
@@ -593,8 +619,9 @@
     <header class="hero">
       <h1 class="hero-title">Decoding Control Center · Neural Text Degeneration Explorer</h1>
       <p class="hero-subtitle">Built for exploring Holtzman et al. (2019) and beyond, as a presentation dashboard for CPSC 532B.</p>
+      <p class="hero-note">Project scope: interactive comparison of greedy, top-k, top-p, and beam search with live distribution analysis and blind preference rounds.</p>
       <div class="hero-row">
-        <div class="field">
+        <div class="field model-compact">
           <label for="model">Model</label>
           <select id="model">
             <option value="gpt2">gpt2 (small)</option>
