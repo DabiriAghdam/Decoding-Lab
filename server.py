@@ -74,6 +74,7 @@ def _load_runtime(model_id):
         "dist_cache": {},
         "dist_cache_order": [],
         "dist_cache_lock": threading.Lock(),
+        "vocab_ids_cache": {},
     }
     with CACHE_LOCK:
         MODEL_CACHE[model_id] = runtime
