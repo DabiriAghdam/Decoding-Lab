@@ -1024,10 +1024,6 @@
             <label for="distPrompt">Distribution Prompt</label>
             <textarea id="distPrompt">The report found that when language models are decoded greedily, they often</textarea>
           </div>
-          <label class="chip" style="width:max-content;">
-            <input id="tab3InstructMode" type="checkbox" />
-            Instruct-tuned prompt mode
-          </label>
 
           <div class="dist-output-grid">
             <div id="tailChart"></div>
@@ -1268,7 +1264,7 @@
     function toModelPrompt(rawPrompt, instructMode) {
       const prompt = (rawPrompt || '').trim();
       if (!instructMode) return prompt;
-      const system = 'You are Qwen, created by Alibaba Cloud. You are a helpful assistant.';
+      const system = 'You are a helpful assistant.';
       return `<|im_start|>system\n${system}<|im_end|>\n<|im_start|>user\n${prompt}<|im_end|>\n<|im_start|>assistant\n`;
     }
 
@@ -2017,10 +2013,9 @@
     let pendingDistRefresh = false;
 
     function localDistributionPayload(prompt, topN) {
-      const instructMode = Boolean($('tab3InstructMode')?.checked);
       return {
         model: apiConfig().model,
-        prompt: toModelPrompt(prompt, instructMode),
+        prompt,
         top_n: topN,
         top_k: Number($('kCut').value),
         top_p: Number($('pCut').value),
@@ -2323,7 +2318,7 @@
         const beamSize = 4;
         const body = {
           model: apiConfig().model,
-          prompt: toModelPrompt(prompt, Boolean($('tab3InstructMode')?.checked)),
+          prompt,
           max_tokens: 1,
           strategy,
         };
