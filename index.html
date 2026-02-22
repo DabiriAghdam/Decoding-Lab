@@ -813,6 +813,10 @@
             <label for="sharedPrompt">Shared Prompt (used by A and B)</label>
             <textarea id="sharedPrompt">In a city where every billboard can write back, a teenager discovers</textarea>
           </div>
+          <label class="chip" style="width:max-content;">
+            <input id="tab1InstructMode" type="checkbox" />
+            Instruct-tuned prompt mode
+          </label>
         </div>
       </div>
 
@@ -1020,6 +1024,10 @@
             <label for="distPrompt">Distribution Prompt</label>
             <textarea id="distPrompt">The report found that when language models are decoded greedily, they often</textarea>
           </div>
+          <label class="chip" style="width:max-content;">
+            <input id="tab3InstructMode" type="checkbox" />
+            Instruct-tuned prompt mode
+          </label>
 
           <div class="dist-output-grid">
             <div id="tailChart"></div>
@@ -1095,6 +1103,10 @@
             <label for="wmPrompt">Watermark Prompt</label>
             <textarea id="wmPrompt">So what's new in my life?</textarea>
           </div>
+          <label class="chip" style="width:max-content;">
+            <input id="tab4InstructMode" type="checkbox" />
+            Instruct-tuned prompt mode
+          </label>
 
           <div class="field">
             <label for="wmStrategy">Decoding Strategy</label>
@@ -1253,6 +1265,13 @@
       return `${p} ${c}`.trim();
     }
 
+    function toModelPrompt(rawPrompt, instructMode) {
+      const prompt = (rawPrompt || '').trim();
+      if (!instructMode) return prompt;
+      const system = 'You are Qwen, created by Alibaba Cloud. You are a helpful assistant.';
+      return `<|im_start|>system\n${system}<|im_end|>\n<|im_start|>user\n${prompt}<|im_end|>\n<|im_start|>assistant\n`;
+    }
+
     const promptTemplates = {
       paper_unicorn: 'In a shocking finding, scientists discovered',
       paper_university: 'The university said in a statement that',
@@ -1332,8 +1351,11 @@
     }
 
     function readSample(prefix) {
+      const rawPrompt = ($('sharedPrompt').value || '').trim() || 'Once upon a time';
+      const instructMode = Boolean($('tab1InstructMode')?.checked);
       return {
-        prompt: ($('sharedPrompt').value || '').trim() || 'Once upon a time',
+        prompt: rawPrompt,
+        model_prompt: toModelPrompt(rawPrompt, instructMode),
         strategy: $(`${prefix}Strategy`).value,
         max_tokens: Number($(`${prefix}MaxTokens`).value),
         temperature: Number($(`${prefix}Temp`).value),
@@ -1346,7 +1368,7 @@
     function buildDecodePayload(cfg) {
       const body = {
         model: apiConfig().model,
-        prompt: cfg.prompt,
+        prompt: cfg.model_prompt || cfg.prompt,
         max_tokens: cfg.max_tokens,
         strategy: cfg.strategy,
       };
@@ -1896,7 +1918,10 @@
       try {
         const body = {
           model: apiConfig().model,
-          prompt: ($('wmPrompt').value || '').trim() || "So what's new in my life?",
+          prompt: toModelPrompt(
+            ($('wmPrompt').value || '').trim() || "So what's new in my life?",
+            Boolean($('tab4InstructMode')?.checked)
+          ),
           strategy: $('wmStrategy').value,
           max_tokens: Number($('wmMaxTokens').value),
           temperature: Number($('wmTemp').value),
@@ -1992,9 +2017,10 @@
     let pendingDistRefresh = false;
 
     function localDistributionPayload(prompt, topN) {
+      const instructMode = Boolean($('tab3InstructMode')?.checked);
       return {
         model: apiConfig().model,
-        prompt,
+        prompt: toModelPrompt(prompt, instructMode),
         top_n: topN,
         top_k: Number($('kCut').value),
         top_p: Number($('pCut').value),
@@ -2297,7 +2323,7 @@
         const beamSize = 4;
         const body = {
           model: apiConfig().model,
-          prompt,
+          prompt: toModelPrompt(prompt, Boolean($('tab3InstructMode')?.checked)),
           max_tokens: 1,
           strategy,
         };
