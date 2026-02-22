@@ -404,6 +404,12 @@
       letter-spacing: 0.01em;
     }
 
+    .metric-help-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
     .metric-help {
       display: inline-flex;
       align-items: center;
@@ -418,6 +424,36 @@
       font-weight: 800;
       cursor: help;
       user-select: none;
+      padding: 0;
+      appearance: none;
+      outline: none;
+    }
+
+    .metric-help-pop {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      width: min(420px, 80vw);
+      background: #0f1f19;
+      color: #e9fff3;
+      border-radius: 10px;
+      border: 1px solid #2e5f4b;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      z-index: 12;
+      display: none;
+    }
+
+    .metric-help-wrap:hover .metric-help-pop,
+    .metric-help-wrap:focus-within .metric-help-pop {
+      display: block;
+    }
+
+    .param-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
     }
 
     .controls {
@@ -776,11 +812,14 @@
 
       <div class="toolbar">
         <button id="generateBoth" class="primary">Generate Both Samples</button>
-        <span
-          class="metric-help"
-          title="Zipf coef: slope-based lexical concentration estimate. Rep-2/3/4: repeated n-gram rates (higher means more repetition). Words: total word count. Tok/s: completion tokens per second. Generated: completion token count."
-          aria-label="Metric definitions"
-        >?</span>
+        <span class="metric-help-wrap">
+          <button class="metric-help" type="button" aria-label="Metric definitions">?</button>
+          <span class="metric-help-pop">
+            Zipf coef: slope-based lexical concentration estimate. Rep-2/3/4: repeated n-gram rates
+            (higher means more repetition). Words: total word count. Tok/s: completion tokens per second.
+            Generated: completion token count.
+          </span>
+        </span>
         <div id="genStatus" class="status"></div>
       </div>
 
@@ -1021,6 +1060,7 @@
                 <option value="sample">Pure Sampling</option>
                 <option value="chart_click">Chart Click (Selected Token)</option>
               </select>
+              <div id="nextStrategyHint" class="param-hint"></div>
             </div>
           </div>
 
@@ -1961,18 +2001,24 @@
         .replace(/ /g, '.');
     }
 
-    function nextTokenModeLabel() {
+    function nextTokenParamHint() {
       const strategy = $('nextTokenStrategy').value;
       const temperature = 0.9;
       const topP = Number($('pCut').value);
       const topK = Number($('kCut').value);
       const beamSize = Number($('nextBeam').value);
-      if (strategy === 'beam') return `Next-token mode: Beam Search (b=${Math.max(1, beamSize || 4)})`;
-      if (strategy === 'topk') return `Next-token mode: Top-k (k=${topK}, temp=${temperature.toFixed(2)})`;
-      if (strategy === 'topp') return `Next-token mode: Top-p (p=${topP.toFixed(2)}, temp=${temperature.toFixed(2)})`;
-      if (strategy === 'sample') return `Next-token mode: Pure Sampling (temp=${temperature.toFixed(2)})`;
-      if (strategy === 'chart_click') return 'Next-token mode: Chart Click (manual token)';
-      return 'Next-token mode: Greedy (deterministic)';
+      if (strategy === 'beam') return `Using Beam Search with b=${Math.max(1, beamSize || 4)}`;
+      if (strategy === 'topk') return `Using Top-k with k=${topK}`;
+      if (strategy === 'topp') return `Using Top-p with p=${topP.toFixed(2)}`;
+      if (strategy === 'sample') return `Using Pure Sampling with temp=${temperature.toFixed(2)}`;
+      if (strategy === 'chart_click') return 'Using Chart Click with selected token';
+      return 'Using Greedy decoding';
+    }
+
+    function updateNextStrategyHint() {
+      const el = $('nextStrategyHint');
+      if (!el) return;
+      el.textContent = nextTokenParamHint();
     }
 
     function drawChartMessage(message) {
@@ -1995,15 +2041,6 @@
           showarrow: false,
           text: message,
           font: { size: 16 },
-        }, {
-          x: 0.99,
-          y: 1.08,
-          xref: 'paper',
-          yref: 'paper',
-          xanchor: 'right',
-          showarrow: false,
-          text: nextTokenModeLabel(),
-          font: { size: 11, color: '#1f4a34' },
         }],
         paper_bgcolor: paperBg,
         plot_bgcolor: plotBg,
@@ -2138,16 +2175,6 @@
               text: pLen <= x.length ? `Top-p boundary (n=${pLen})` : `Top-p boundary (n=${pLen}, off-chart)`,
               showarrow: false,
               font: { size: 12, color: topPLine },
-            },
-            {
-              x: 0.99,
-              y: 1.08,
-              xref: 'paper',
-              yref: 'paper',
-              xanchor: 'right',
-              showarrow: false,
-              text: nextTokenModeLabel(),
-              font: { size: 11, color: '#1f4a34' },
             },
           ],
           hoverlabel: {
@@ -2316,9 +2343,11 @@
     $('undoToken').addEventListener('click', undoLastToken);
     $('distPrompt').addEventListener('input', () => scheduleDistRefresh(450));
     $('kCut').addEventListener('input', drawDistribution);
-    $('nextBeam').addEventListener('input', drawDistribution);
-    $('nextTokenStrategy').addEventListener('change', drawDistribution);
+    $('nextBeam').addEventListener('input', updateNextStrategyHint);
+    $('nextTokenStrategy').addEventListener('change', updateNextStrategyHint);
     $('pCut').addEventListener('input', () => scheduleDistRefresh(220));
+    $('pCut').addEventListener('input', updateNextStrategyHint);
+    $('kCut').addEventListener('input', updateNextStrategyHint);
     $('distN').addEventListener('change', fetchRealDistribution);
     window.addEventListener('resize', drawDistribution);
 
@@ -2336,6 +2365,7 @@
     }
     $('arenaStatus').textContent = 'Ready.';
     $('distStatus').textContent = 'Ready.';
+    updateNextStrategyHint();
     drawChartMessage('Click "Load Model" or open this tab to load distribution.');
 
     checkApiServer();
