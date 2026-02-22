@@ -265,7 +265,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         model = runtime["model"]
         device = runtime["device"]
 
-        top_n = max(5, min(int(top_n), 200))
+        top_n = max(5, min(int(top_n), 320))
         inputs = tokenizer(prompt, return_tensors="pt")
         input_ids = inputs["input_ids"].to(device)
         attention_mask = inputs.get("attention_mask")

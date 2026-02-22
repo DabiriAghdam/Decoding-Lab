@@ -264,7 +264,15 @@
       padding: 14px;
     }
 
-    .panel.active { display: block; }
+    .panel.active {
+      display: block;
+      animation: panelFade 320ms ease;
+    }
+
+    @keyframes panelFade {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
 
     .toolbar {
       display: grid;
@@ -341,6 +349,12 @@
       padding: 12px;
       display: grid;
       gap: 10px;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .card:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
     }
 
     .sample-header {
@@ -386,13 +400,13 @@
 
     /* Keep Tab 1 outputs stable for side-by-side comparison */
     #sampleA, #sampleB {
-      height: 320px;
-      min-height: 320px;
+      height: 280px;
+      min-height: 280px;
       overflow-y: auto;
     }
 
     .compare-card {
-      grid-template-rows: auto 320px auto auto auto;
+      grid-template-rows: auto 280px auto auto auto;
       align-content: start;
     }
 
@@ -443,12 +457,24 @@
       min-height: 220px;
       display: grid;
       gap: 8px;
+      font-weight: 500;
     }
 
     .arena-option h4 {
       margin: 0;
       font-size: 0.95rem;
       letter-spacing: 0.01em;
+    }
+
+    .arena-option .mono {
+      font-weight: 400;
+    }
+
+    .arena-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      min-height: 1.1em;
+      font-weight: 600;
     }
 
     .result-ok { color: var(--ok); font-weight: 800; }
@@ -616,6 +642,9 @@
               <option value="paper_news">Paper · The report found that</option>
               <option value="paper_fig5_flat">Paper Fig 5 · She said, \" I never</option>
               <option value="paper_fig5_peaked">Paper Fig 5 · I ate the pizza while it was still</option>
+              <option value="paper_appendix_life">Paper Appendix · So what's new in my life?</option>
+              <option value="paper_appendix_vacation">Paper Appendix · Just got back from vacation.</option>
+              <option value="paper_appendix_wallpaper">Paper Appendix · How can I change the background wallpaper</option>
               <option value="city_billboard">Reactive city billboard story</option>
               <option value="receipt_poetry">Receipt poetry at midnight</option>
               <option value="satellite_last">Satellite final message</option>
@@ -773,11 +802,13 @@
         <div class="arena-grid">
           <button id="pickLeft" class="card arena-option">
             <h4>Option Left</h4>
+            <div id="leftMeta" class="arena-meta"></div>
             <div id="leftText" class="mono"></div>
           </button>
 
           <button id="pickRight" class="card arena-option">
             <h4>Option Right</h4>
+            <div id="rightMeta" class="arena-meta"></div>
             <div id="rightText" class="mono"></div>
           </button>
         </div>
@@ -802,6 +833,9 @@
               <option value="paper_news">Paper · The report found that</option>
               <option value="paper_fig5_flat">Paper Fig 5 · She said, \" I never</option>
               <option value="paper_fig5_peaked">Paper Fig 5 · I ate the pizza while it was still</option>
+              <option value="paper_appendix_life">Paper Appendix · So what's new in my life?</option>
+              <option value="paper_appendix_vacation">Paper Appendix · Just got back from vacation.</option>
+              <option value="paper_appendix_wallpaper">Paper Appendix · How can I change the background wallpaper</option>
               <option value="city_billboard">Reactive city billboard story</option>
               <option value="receipt_poetry">Receipt poetry at midnight</option>
               <option value="satellite_last">Satellite final message</option>
@@ -955,12 +989,64 @@
       paper_news: 'The report found that',
       paper_fig5_flat: 'She said, " I never',
       paper_fig5_peaked: 'I ate the pizza while it was still',
+      paper_appendix_life: "So what's new in my life?",
+      paper_appendix_vacation: 'Just got back from vacation.',
+      paper_appendix_wallpaper: 'How can I change the background wallpaper for my screen?',
       city_billboard: 'In a city where every billboard can write back, a teenager discovers',
       receipt_poetry: 'At midnight the chatbot started writing poetry on receipts, and by dawn',
       satellite_last: 'A satellite with a sense of humor sent one final message:',
       museum_diary: 'When the museum digitized every diary, historians were shocked because',
       weather_mood: 'The AI weather report stopped predicting rain and started predicting moods.'
     };
+
+    function tokenWords(text) {
+      return (text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9'\s]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean);
+    }
+
+    function ngramRepetition(words, n) {
+      if (words.length < n) return 0;
+      const counts = new Map();
+      const grams = [];
+      for (let i = 0; i <= words.length - n; i += 1) {
+        const gram = words.slice(i, i + n).join('|');
+        grams.push(gram);
+        counts.set(gram, (counts.get(gram) || 0) + 1);
+      }
+      let repeated = 0;
+      for (const gram of grams) {
+        if ((counts.get(gram) || 0) > 1) repeated += 1;
+      }
+      return repeated / grams.length;
+    }
+
+    function zipfCoefficient(words) {
+      if (!words.length) return 0;
+      const counts = new Map();
+      for (const w of words) counts.set(w, (counts.get(w) || 0) + 1);
+      const freqs = [...counts.values()].sort((a, b) => b - a);
+      if (freqs.length < 2) return 0;
+      let sumX = 0;
+      let sumY = 0;
+      let sumXY = 0;
+      let sumXX = 0;
+      const n = freqs.length;
+      for (let i = 0; i < n; i += 1) {
+        const x = Math.log(i + 1);
+        const y = Math.log(freqs[i]);
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumXX += x * x;
+      }
+      const denom = (n * sumXX) - (sumX * sumX);
+      if (!Number.isFinite(denom) || Math.abs(denom) < 1e-12) return 0;
+      const slope = ((n * sumXY) - (sumX * sumY)) / denom;
+      return -slope;
+    }
 
     function readSample(prefix) {
       return {
@@ -1086,19 +1172,20 @@
     }
 
     function metricPills(container, text, performance, usage) {
-      const words = text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
-      const oneGrams = new Set(words);
-      const twoGrams = new Set(words.slice(0, -1).map((w, i) => `${w}|${words[i + 1]}`));
-      const rep = words.length ? 1 - (oneGrams.size / words.length) : 0;
+      const words = tokenWords(text);
+      const rep2 = ngramRepetition(words, 2);
+      const rep3 = ngramRepetition(words, 3);
+      const rep4 = ngramRepetition(words, 4);
+      const zipf = zipfCoefficient(words);
 
       const metrics = [
-        `Distinct-1 ${(words.length ? (oneGrams.size / words.length) : 0).toFixed(2)}`,
-        `Distinct-2 ${(words.length > 1 ? (twoGrams.size / (words.length - 1)) : 0).toFixed(2)}`,
-        `Repetition ${rep.toFixed(2)}`,
+        `Zipf coef ${zipf.toFixed(2)}`,
+        `Rep-2 ${(rep2 * 100).toFixed(1)}%`,
+        `Rep-3 ${(rep3 * 100).toFixed(1)}%`,
+        `Rep-4 ${(rep4 * 100).toFixed(1)}%`,
         `Words ${words.length}`,
       ];
 
-      if (performance?.elapsed_ms != null) metrics.push(`Time ${(performance.elapsed_ms / 1000).toFixed(2)}s`);
       if (performance?.tokens_per_second != null) metrics.push(`Tok/s ${Number(performance.tokens_per_second).toFixed(1)}`);
       if (usage?.completion_tokens != null) metrics.push(`Generated ${usage.completion_tokens}`);
 
@@ -1139,6 +1226,7 @@
 
       updateSampleTitle(prefix);
       outputEl.textContent = 'Generating...';
+      outputEl.classList.add('generating');
       metricsEl.innerHTML = '';
       statusEl.textContent = 'Generating...';
       statusEl.classList.remove('error');
@@ -1158,10 +1246,12 @@
         );
 
         outputEl.textContent = out.fullText;
+        outputEl.classList.remove('generating');
         metricPills(metricsEl, out.fullText, out.performance, out.usage);
         statusEl.textContent = 'Done.';
         return out;
       } catch (err) {
+        outputEl.classList.remove('generating');
         statusEl.textContent = `Failed: ${err.message}`;
         statusEl.classList.add('error');
         throw err;
@@ -1261,6 +1351,9 @@
       promptTemplates.paper_news,
       promptTemplates.paper_fig5_flat,
       promptTemplates.paper_fig5_peaked,
+      promptTemplates.paper_appendix_life,
+      promptTemplates.paper_appendix_vacation,
+      promptTemplates.paper_appendix_wallpaper,
       promptTemplates.city_billboard,
       promptTemplates.receipt_poetry,
       promptTemplates.satellite_last,
@@ -1281,7 +1374,6 @@
       'Beam Search': 0,
       'Top-k': 0,
       'Top-p (Nucleus)': 0,
-      'Top-k + Top-p': 0,
     };
 
     function arenaPairConfigs(prompt) {
@@ -1358,6 +1450,8 @@
       $('roundResult').textContent = '';
       $('revealBox').textContent = '';
       $('arenaStatus').textContent = 'Generating round...';
+      $('leftMeta').textContent = '';
+      $('rightMeta').textContent = '';
       $('leftText').textContent = 'Generating...';
       $('rightText').textContent = 'Generating...';
 
@@ -1370,10 +1464,14 @@
 
         if (leftIsPrimary) {
           $('leftText').textContent = outFirst.fullText;
+          $('leftMeta').textContent = `Tok/s ${Number(outFirst?.performance?.tokens_per_second || 0).toFixed(1)} · Generated ${Number(outFirst?.usage?.completion_tokens || 0)}`;
           $('rightText').textContent = outSecond.fullText;
+          $('rightMeta').textContent = `Tok/s ${Number(outSecond?.performance?.tokens_per_second || 0).toFixed(1)} · Generated ${Number(outSecond?.usage?.completion_tokens || 0)}`;
         } else {
           $('leftText').textContent = outSecond.fullText;
+          $('leftMeta').textContent = `Tok/s ${Number(outSecond?.performance?.tokens_per_second || 0).toFixed(1)} · Generated ${Number(outSecond?.usage?.completion_tokens || 0)}`;
           $('rightText').textContent = outFirst.fullText;
+          $('rightMeta').textContent = `Tok/s ${Number(outFirst?.performance?.tokens_per_second || 0).toFixed(1)} · Generated ${Number(outFirst?.usage?.completion_tokens || 0)}`;
         }
 
         $('arenaStatus').textContent = 'Round ready.';
@@ -1398,7 +1496,7 @@
       $('revealBox').innerHTML =
         `Left uses <strong>${leftMethod}</strong> | Right uses <strong>${rightMethod}</strong><br>` +
         `Current winner: <strong>${winner[0]}</strong> (${winner[1]} votes) · ` +
-        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam Search']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']} | Hybrid ${methodWins['Top-k + Top-p']}`;
+        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam Search']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']}`;
 
       if (arenaRound >= MAX_ARENA_ROUNDS - 1) {
         arenaFinished = true;
@@ -1437,6 +1535,8 @@
       $('arenaStatus').textContent = 'Arena reset. Generate round 1.';
       $('leftText').textContent = '';
       $('rightText').textContent = '';
+      $('leftMeta').textContent = '';
+      $('rightMeta').textContent = '';
       $('nextRound').disabled = false;
       $('genRound').disabled = false;
       $('pickLeft').disabled = false;
@@ -1815,3 +1915,14 @@
   </script>
 </body>
 </html>
+    .mono.generating {
+      background:
+        linear-gradient(90deg, rgba(36, 120, 79, 0.08), rgba(36, 120, 79, 0.16), rgba(36, 120, 79, 0.08));
+      background-size: 220% 100%;
+      animation: loadingSweep 1.2s linear infinite;
+    }
+
+    @keyframes loadingSweep {
+      from { background-position: 200% 0; }
+      to { background-position: -200% 0; }
+    }

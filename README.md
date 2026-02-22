@@ -41,10 +41,42 @@ Optional host/port override:
 HOST=127.0.0.1 PORT=8017 python3 server.py
 ```
 
+## Windows and Linux
+Yes, the project runs on both.
+
+- **Linux**:
+  ```bash
+  python3 server.py
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  py server.py
+  ```
+- **Windows (host/port override)**:
+  ```powershell
+  $env:HOST="127.0.0.1"; $env:PORT="8017"; py server.py
+  ```
+
+Notes:
+- `mps` acceleration is Mac-only. On Linux/Windows, this will use CUDA (if available) or CPU.
+- The first load is always slower because the model is loaded into memory.
+
 ## Notes
 - The frontend auto-preloads the default model (`gpt2-large`) on page load.
 - Backend endpoints are served under `/api/local/*`.
 - Generation and distribution are computed locally with Hugging Face Transformers.
+
+## Free Hosting Options
+You can host it for free, but with an important caveat: free tiers are usually **CPU-only**, so large local models will be slow.
+
+- **Hugging Face Spaces (Free CPU Basic)**:
+  - Good for demos and sharing.
+  - Best path for this project if you keep models small.
+- **Render (Free web service tier)**:
+  - Can host Python services, but free instances can sleep when idle.
+- **Cloudflare Tunnel (free) + your local machine**:
+  - Quick way to share your running local app publicly during presentation.
+  - Your own machine still does all model inference.
 
 ## Troubleshooting
 - **Address already in use**: run on a different port, e.g. `PORT=8017 python3 server.py`.
