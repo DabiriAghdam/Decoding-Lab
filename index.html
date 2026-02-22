@@ -136,7 +136,7 @@
     }
 
     .model-compact select {
-      font-size: 0.92rem;
+      font-size: 0.95rem;
       padding: 8px 10px;
     }
 
@@ -265,7 +265,7 @@
 
     .tabs {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -320,7 +320,7 @@
     }
 
     .status.error { color: var(--danger); }
-
+      .status.error { color: #e53935; }
     body[data-theme="night"] input[type="text"],
     body[data-theme="night"] textarea,
     body[data-theme="night"] select,
@@ -402,6 +402,58 @@
       margin: 0;
       font-size: 1.03rem;
       letter-spacing: 0.01em;
+    }
+
+    .metric-help-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .metric-help {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid #b8d9c6;
+      background: #eef9f2;
+      color: #1f4a34;
+      font-size: 0.72rem;
+      font-weight: 800;
+      cursor: help;
+      user-select: none;
+      padding: 0;
+      appearance: none;
+      outline: none;
+    }
+
+    .metric-help-pop {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      width: min(420px, 80vw);
+      background: #0f1f19;
+      color: #e9fff3;
+      border-radius: 10px;
+      border: 1px solid #2e5f4b;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      z-index: 12;
+      display: none;
+    }
+
+    .metric-help-wrap:hover .metric-help-pop,
+    .metric-help-wrap:focus-within .metric-help-pop {
+      display: block;
+    }
+
+    .param-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
     }
 
     .controls {
@@ -606,6 +658,64 @@
       box-shadow: var(--shadow-sm);
     }
 
+    .wm-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .wm-output {
+      min-height: 280px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .wm-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .wm-col h4 {
+      margin: 0 0 6px 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+      letter-spacing: 0.01em;
+    }
+
+    .wm-token {
+      display: inline-block;
+      margin: 2px 3px 2px 0;
+      padding: 2px 5px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .wm-token.green {
+      background: rgba(19, 108, 68, 0.16);
+      border-color: rgba(19, 108, 68, 0.38);
+      color: #145437;
+    }
+
+    .wm-token.red {
+      background: rgba(180, 35, 24, 0.12);
+      border-color: rgba(180, 35, 24, 0.32);
+      color: #7f1d17;
+    }
+
+    .wm-legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
     body[data-theme="night"] .site-footer {
       background: #11202b;
     }
@@ -623,7 +733,9 @@
       .controls { grid-template-columns: 1fr; }
       .dist-output-grid,
       .dist-controls-grid,
-      .dist-actions { grid-template-columns: 1fr; }
+      .dist-actions,
+      .wm-grid { grid-template-columns: 1fr; }
+      .wm-compare { grid-template-columns: 1fr; }
       #tailChart { height: 360px; }
     }
   </style>
@@ -637,24 +749,20 @@
       <div class="field theme-topright">
         <label for="themeSelect">Theme</label>
         <select id="themeSelect">
-          <option value="forest" selected>Forest Light</option>
-          <option value="ocean">Ocean Light</option>
-          <option value="night">Night Mode</option>
+          <option value="forest" selected>Forest</option>
+          <option value="ocean">Ocean</option>
+          <option value="night">Night</option>
         </select>
       </div>
       <div class="hero-row">
         <div class="field model-compact">
           <label for="model">Model</label>
           <select id="model">
-            <option value="gpt2">gpt2 (small)</option>
-            <option value="gpt2-medium">gpt2-medium</option>
             <option value="gpt2-large" selected>gpt2-large</option>
             <option value="gpt2-xl">gpt2-xl</option>
-            <option value="distilgpt2">distilgpt2</option>
+            <option value="gpt2-medium">gpt2-medium</option>
             <option value="Qwen/Qwen3-0.6B">Qwen3-0.6B</option>
-            <option value="EleutherAI/pythia-410m-deduped">EleutherAI/pythia-410m-deduped</option>
-            <option value="Qwen/Qwen2.5-0.5B">Qwen/Qwen2.5-0.5B</option>
-            <option value="TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T">TinyLlama-1.1B</option>
+            <option value="Qwen/Qwen2.5-0.5B">Qwen2.5-0.5B</option>
           </select>
         </div>
         <button id="preloadModel">Load Model</button>
@@ -667,6 +775,7 @@
       <button class="tab-btn active" data-tab="tab3">Distribution Explorer</button>
       <button class="tab-btn" data-tab="tab1">Side-by-Side Decode</button>
       <button class="tab-btn" data-tab="tab2">Human Preference Arena</button>
+      <button class="tab-btn" data-tab="tab4">KGW Watermark (Bonus)</button>
     </nav>
 
     <section id="tab1" class="panel">
@@ -703,6 +812,14 @@
 
       <div class="toolbar">
         <button id="generateBoth" class="primary">Generate Both Samples</button>
+        <span class="metric-help-wrap">
+          <button class="metric-help" type="button" aria-label="Metric definitions">?</button>
+          <span class="metric-help-pop">
+            Zipf coef: slope-based lexical concentration estimate. Rep-2/3/4: repeated n-gram rates
+            (higher means more repetition). Words: total word count. Tok/s: completion tokens per second.
+            Generated: completion token count.
+          </span>
+        </span>
         <div id="genStatus" class="status"></div>
       </div>
 
@@ -725,6 +842,7 @@
                 <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp" selected>Top-p (Nucleus)</option>
+                <option value="sample">Pure Sampling</option>
               </select>
             </div>
 
@@ -735,22 +853,22 @@
 
             <div id="aTempWrap" class="field">
               <label for="aTemp">Temperature: <span id="aTempVal">1.00</span></label>
-              <input id="aTemp" type="range" min="0" max="1.8" step="0.05" value="1.00" />
+              <input id="aTemp" type="range" min="0" max="2.0" step="0.05" value="1.00" />
             </div>
 
             <div id="aTopkWrap" class="field">
               <label for="aTopk">Top-k: <span id="aTopkVal">40</span></label>
-              <input id="aTopk" type="range" min="1" max="120" step="1" value="40" />
+              <input id="aTopk" type="range" min="1" max="320" step="1" value="40" />
             </div>
 
             <div id="aToppWrap" class="field">
-              <label for="aTopp">Top-p: <span id="aToppVal">0.92</span></label>
-              <input id="aTopp" type="range" min="0.20" max="1.00" step="0.01" value="0.92" />
+              <label for="aTopp">Top-p: <span id="aToppVal">0.95</span></label>
+              <input id="aTopp" type="range" min="0.10" max="1.00" step="0.01" value="0.95" />
             </div>
 
             <div id="aBeamWrap" class="field">
               <label for="aBeam">Beam Size (b): <span id="aBeamVal">4</span></label>
-              <input id="aBeam" type="range" min="1" max="8" step="1" value="4" />
+              <input id="aBeam" type="range" min="1" max="16" step="1" value="4" />
             </div>
 
           </div>
@@ -774,6 +892,7 @@
                 <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp">Top-p (Nucleus)</option>
+                <option value="sample">Pure Sampling</option>
               </select>
             </div>
 
@@ -784,22 +903,22 @@
 
             <div id="bTempWrap" class="field">
               <label for="bTemp">Temperature: <span id="bTempVal">1.00</span></label>
-              <input id="bTemp" type="range" min="0" max="1.8" step="0.05" value="1.00" />
+              <input id="bTemp" type="range" min="0" max="2.0" step="0.05" value="1.00" />
             </div>
 
             <div id="bTopkWrap" class="field">
               <label for="bTopk">Top-k: <span id="bTopkVal">40</span></label>
-              <input id="bTopk" type="range" min="1" max="120" step="1" value="40" />
+              <input id="bTopk" type="range" min="1" max="320" step="1" value="40" />
             </div>
 
             <div id="bToppWrap" class="field">
-              <label for="bTopp">Top-p: <span id="bToppVal">0.92</span></label>
-              <input id="bTopp" type="range" min="0.20" max="1.00" step="0.01" value="0.92" />
+              <label for="bTopp">Top-p: <span id="bToppVal">0.95</span></label>
+              <input id="bTopp" type="range" min="0.10" max="1.00" step="0.01" value="0.95" />
             </div>
 
             <div id="bBeamWrap" class="field">
               <label for="bBeam">Beam Size (b): <span id="bBeamVal">4</span></label>
-              <input id="bBeam" type="range" min="1" max="8" step="1" value="4" />
+              <input id="bBeam" type="range" min="1" max="16" step="1" value="4" />
             </div>
 
           </div>
@@ -822,8 +941,9 @@
             <div class="field">
               <label for="arenaPair">Method Pair</label>
               <select id="arenaPair">
-                <option value="random_blind">Random Pair (Blind)</option>
                 <option value="topp_vs_greedy">Top-p vs Greedy</option>
+                <option value="sample_vs_greedy">Pure Sampling vs Greedy</option>
+                <option value="sample_vs_topp">Pure Sampling vs Top-p</option>
                 <option value="beam_vs_greedy">Beam Search vs Greedy</option>
                 <option value="topk_vs_greedy">Top-k vs Greedy</option>
                 <option value="topp_vs_topk">Top-p vs Top-k</option>
@@ -924,22 +1044,106 @@
               <input id="pCut" type="range" min="0.10" max="1.00" step="0.01" value="0.90" />
             </div>
 
-          <div class="field">
-            <label for="nextTokenStrategy">Next Token Strategy</label>
-            <select id="nextTokenStrategy">
-              <option value="greedy">Greedy</option>
-              <option value="beam">Beam Search</option>
-              <option value="topk">Top-k</option>
-              <option value="topp" selected>Top-p (Nucleus)</option>
-              <option value="chart_click">Chart Click (Selected Token)</option>
-            </select>
-          </div>
+            <div class="field">
+              <label for="nextTokenStrategy">Next Token Strategy</label>
+              <select id="nextTokenStrategy">
+                <option value="greedy">Greedy</option>
+                <option value="beam">Beam Search</option>
+                <option value="topk">Top-k</option>
+                <option value="topp" selected>Top-p (Nucleus)</option>
+                <option value="sample">Pure Sampling</option>
+                <option value="chart_click">Chart Click (Selected Token)</option>
+              </select>
+              <div id="nextStrategyHint" class="param-hint"></div>
+            </div>
           </div>
 
           <div class="dist-actions">
             <button id="generateNextToken">Generate Next Token</button>
             <button id="undoToken">Undo Last Token</button>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab4" class="panel">
+      <div class="wm-grid">
+        <div class="card">
+          <div class="field">
+            <label for="wmTemplate">Prompt Template</label>
+            <select id="wmTemplate">
+              <option value="paper_appendix_life">Paper Appendix · So what's new in my life?</option>
+              <option value="paper_unicorn">Paper · In a shocking finding, scientists discovered</option>
+              <option value="paper_university">Paper · The university said in a statement that</option>
+              <option value="paper_city">Paper · The city council announced that</option>
+              <option value="paper_fig5_flat">Paper Fig 5 · She said, " I never</option>
+              <option value="paper_fig5_peaked">Paper Fig 5 · I ate the pizza while it was still</option>
+              <option value="city_billboard">Reactive city billboard story</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="wmPrompt">Watermark Prompt</label>
+            <textarea id="wmPrompt">So what's new in my life?</textarea>
+          </div>
+
+          <div class="field">
+            <label for="wmStrategy">Decoding Strategy</label>
+            <select id="wmStrategy">
+              <option value="topp">Top-p (Nucleus)</option>
+              <option value="topk">Top-k</option>
+              <option value="greedy" selected>Greedy</option>
+              <option value="sample">Pure Sampling</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="wmMaxTokens">Max Tokens: <span id="wmMaxTokensVal">80</span></label>
+            <input id="wmMaxTokens" type="range" min="10" max="200" step="10" value="80" />
+          </div>
+          <div class="field">
+            <label for="wmTemp">Temperature: <span id="wmTempVal">1.00</span></label>
+            <input id="wmTemp" type="range" min="0.00" max="2.00" step="0.05" value="1.00" />
+          </div>
+          <div class="field" id="wmTopPWrap">
+            <label for="wmTopP">Top-p: <span id="wmTopPVal">0.95</span></label>
+            <input id="wmTopP" type="range" min="0.10" max="1.00" step="0.01" value="0.95" />
+          </div>
+          <div class="field" id="wmTopKWrap">
+            <label for="wmTopK">Top-k: <span id="wmTopKVal">40</span></label>
+            <input id="wmTopK" type="range" min="1" max="320" step="1" value="40" />
+          </div>
+          <div class="field">
+            <label for="wmGamma">Gamma (green ratio): <span id="wmGammaVal">0.25</span></label>
+            <input id="wmGamma" type="range" min="0.05" max="0.80" step="0.01" value="0.25" />
+          </div>
+          <div class="field">
+            <label for="wmDelta">Delta (bias): <span id="wmDeltaVal">2.00</span></label>
+            <input id="wmDelta" type="range" min="0.00" max="5.00" step="0.10" value="2.00" />
+          </div>
+          <div class="field">
+            <label for="wmKey">Seeding Key</label>
+            <input id="wmKey" type="text" value="15485863" />
+          </div>
+
+          <button id="wmGenerate" class="primary">Generate Watermarked Text</button>
+          <div id="wmStatus" class="status"></div>
+        </div>
+
+        <div class="card">
+          <div class="wm-legend">
+            <span><span class="wm-token green">green</span> in greenlist</span>
+            <span><span class="wm-token red">red</span> out of greenlist</span>
+          </div>
+          <div class="wm-compare">
+            <div class="wm-col">
+              <h4>KGW Watermarked</h4>
+              <div id="wmOutput" class="mono wm-output"></div>
+            </div>
+            <div class="wm-col">
+              <h4>No Watermark Baseline</h4>
+              <div id="wmOutputPlain" class="mono wm-output"></div>
+            </div>
+          </div>
+          <div id="wmMetrics" class="metrics"></div>
         </div>
       </div>
     </section>
@@ -985,6 +1189,7 @@
       if (v === 'greedy') return 'Greedy';
       if (v === 'beam') return 'Beam Search';
       if (v === 'topk') return 'Top-k';
+      if (v === 'sample') return 'Pure Sampling';
       return 'Top-p (Nucleus)';
     }
 
@@ -1012,6 +1217,12 @@
     attachRange('kCut', 'kCutVal');
     attachRange('pCut', 'pCutVal', (v) => v.toFixed(2));
     attachRange('arenaMaxTokens', 'arenaMaxTokensVal');
+    attachRange('wmMaxTokens', 'wmMaxTokensVal');
+    attachRange('wmTemp', 'wmTempVal', (v) => v.toFixed(2));
+    attachRange('wmTopP', 'wmTopPVal', (v) => v.toFixed(2));
+    attachRange('wmTopK', 'wmTopKVal');
+    attachRange('wmGamma', 'wmGammaVal', (v) => v.toFixed(2));
+    attachRange('wmDelta', 'wmDeltaVal', (v) => v.toFixed(2));
 
     function mergePromptCompletion(prompt, completion) {
       const p = (prompt || '').trim();
@@ -1041,6 +1252,15 @@
       museum_diary: 'When the museum digitized every diary, historians were shocked because',
       weather_mood: 'The AI weather report stopped predicting rain and started predicting moods.'
     };
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
     function tokenWords(text) {
       return (text || '')
@@ -1108,6 +1328,7 @@
         model: apiConfig().model,
         prompt: cfg.prompt,
         max_tokens: cfg.max_tokens,
+        strategy: cfg.strategy,
       };
       if (cfg.strategy === 'greedy') {
         body.temperature = 0;
@@ -1117,7 +1338,7 @@
       if (cfg.strategy === 'beam') {
         body.temperature = 0;
         body.top_p = 1;
-        body.beam_size = Math.max(2, Number(cfg.beam_size) || 4);
+        body.beam_size = Math.max(1, Number(cfg.beam_size) || 4);
         return body;
       }
       if (cfg.strategy === 'topk') {
@@ -1126,15 +1347,17 @@
         body.top_k = cfg.top_k;
         return body;
       }
+      if (cfg.strategy === 'sample') {
+        body.temperature = cfg.temperature;
+        body.top_p = 1;
+        return body;
+      }
       if (cfg.strategy === 'topp') {
         body.temperature = cfg.temperature;
         body.top_p = cfg.top_p;
         return body;
       }
-      body.temperature = cfg.temperature;
-      body.top_p = cfg.top_p;
-      body.top_k = cfg.top_k;
-      return body;
+      throw new Error(`Unsupported strategy: ${cfg.strategy}`);
     }
 
     async function localChat(cfg) {
@@ -1240,22 +1463,43 @@
       $(`sample${prefix.toUpperCase()}Title`).textContent = `Sample ${prefix.toUpperCase()} · ${label}`;
     }
 
+    const SAMPLE_STRATEGY_UI = {
+      greedy: { temp: false, topk: false, topp: false, beam: false },
+      beam: { temp: false, topk: false, topp: false, beam: true },
+      topk: { temp: true, topk: true, topp: false, beam: false },
+      topp: { temp: true, topk: false, topp: true, beam: false },
+      sample: { temp: true, topk: false, topp: false, beam: false },
+    };
+
+    const WM_STRATEGY_UI = {
+      greedy: { temp: false, topk: false, topp: false },
+      topk: { temp: true, topk: true, topp: false },
+      topp: { temp: true, topk: false, topp: true },
+      sample: { temp: true, topk: false, topp: false },
+    };
+
     function updateMethodControls(prefix) {
       const strategy = $(`${prefix}Strategy`).value;
-      const showTemp = strategy === 'topk' || strategy === 'topp';
-      const showTopK = strategy === 'topk';
-      const showTopP = strategy === 'topp';
-      const showBeam = strategy === 'beam';
-      $(`${prefix}TempWrap`).style.display = showTemp ? '' : 'none';
-      $(`${prefix}TopkWrap`).style.display = showTopK ? '' : 'none';
-      $(`${prefix}ToppWrap`).style.display = showTopP ? '' : 'none';
-      $(`${prefix}BeamWrap`).style.display = showBeam ? '' : 'none';
+      const cfg = SAMPLE_STRATEGY_UI[strategy] || SAMPLE_STRATEGY_UI.topp;
+      $(`${prefix}TempWrap`).style.display = cfg.temp ? '' : 'none';
+      $(`${prefix}TopkWrap`).style.display = cfg.topk ? '' : 'none';
+      $(`${prefix}ToppWrap`).style.display = cfg.topp ? '' : 'none';
+      $(`${prefix}BeamWrap`).style.display = cfg.beam ? '' : 'none';
+    }
+
+    function updateWmControls() {
+      const strategy = $('wmStrategy').value;
+      const cfg = WM_STRATEGY_UI[strategy] || WM_STRATEGY_UI.topp;
+      $('wmTemp').closest('.field').style.display = cfg.temp ? '' : 'none';
+      $('wmTopKWrap').style.display = cfg.topk ? '' : 'none';
+      $('wmTopPWrap').style.display = cfg.topp ? '' : 'none';
     }
 
     ['aStrategy', 'aTemp', 'aTopk', 'aTopp', 'aBeam'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('a')));
     ['bStrategy', 'bTemp', 'bTopk', 'bTopp', 'bBeam'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('b')));
     $('aStrategy').addEventListener('change', () => { updateSampleTitle('a'); updateMethodControls('a'); });
     $('bStrategy').addEventListener('change', () => { updateSampleTitle('b'); updateMethodControls('b'); });
+    $('wmStrategy').addEventListener('change', updateWmControls);
 
     const genStatusEl = $('genStatus');
 
@@ -1339,11 +1583,18 @@
         fetchRealDistribution();
       }
     });
+    $('wmTemplate').addEventListener('change', () => {
+      const key = $('wmTemplate').value;
+      if (promptTemplates[key]) {
+        $('wmPrompt').value = promptTemplates[key];
+        $('wmStatus').textContent = 'Template applied to watermark prompt.';
+      }
+    });
     $('themeSelect').addEventListener('change', () => applyTheme($('themeSelect').value));
 
     $('preloadModel').addEventListener('click', async () => {
       const connStatus = $('connStatus');
-      connStatus.textContent = 'Preloading model...';
+      connStatus.textContent = 'Loading model...';
       drawChartMessage(`Loading model: ${apiConfig().model}...`);
       $('distStatus').textContent = 'Waiting for model to load...';
       try {
@@ -1357,7 +1608,7 @@
         connStatus.textContent = `Loaded on ${payload.device || 'device'} in ${payload.loaded_in_s || '?'}s`;
         await fetchRealDistribution();
       } catch (err) {
-        connStatus.textContent = `Preload failed: ${err.message}`;
+        connStatus.textContent = `Load failed: ${err.message}`;
       }
     });
 
@@ -1409,6 +1660,7 @@
       'Beam Search': 0,
       'Top-k': 0,
       'Top-p (Nucleus)': 0,
+      'Pure Sampling': 0,
     };
 
     function arenaPairConfigs(prompt) {
@@ -1431,7 +1683,7 @@
         strategy: 'topp',
         temperature: 0.95,
         top_k: 40,
-        top_p: 0.92,
+        top_p: 0.95,
         max_tokens: arenaMaxTokens,
       };
       const beam = {
@@ -1453,17 +1705,15 @@
         top_p: 1,
         max_tokens: arenaMaxTokens,
       };
-      const pool = [
-        { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy' },
-        { left: beam, right: greedy, leftName: 'Beam Search', rightName: 'Greedy' },
-        { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy' },
-        { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' },
-        { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)' },
-      ];
-      if (pair === 'random_blind') {
-        const picked = pool[Math.floor(Math.random() * pool.length)];
-        return { ...picked, randomPair: true };
-      }
+      const sample = {
+        model,
+        prompt,
+        strategy: 'sample',
+        temperature: 1.0,
+        top_k: 0,
+        top_p: 1,
+        max_tokens: arenaMaxTokens,
+      };
       if (pair === 'topk_vs_greedy') {
         return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy' };
       }
@@ -1472,6 +1722,12 @@
       }
       if (pair === 'beam_vs_topp') {
         return { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)' };
+      }
+      if (pair === 'sample_vs_greedy') {
+        return { left: sample, right: greedy, leftName: 'Pure Sampling', rightName: 'Greedy' };
+      }
+      if (pair === 'sample_vs_topp') {
+        return { left: sample, right: topp, leftName: 'Pure Sampling', rightName: 'Top-p (Nucleus)' };
       }
       if (pair === 'topp_vs_topk') {
         return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' };
@@ -1483,7 +1739,7 @@
       if (arenaFinished) return;
       const prompt = arenaPrompts[round];
       const pair = arenaPairConfigs(prompt);
-      const leftIsPrimary = Math.random() > 0.5;
+      let leftIsPrimary = Math.random() > 0.5;
 
       roundPicked = false;
       $('pickLeft').disabled = false;
@@ -1491,9 +1747,7 @@
       $('roundNum').textContent = String(arenaRound + 1);
       $('roundResult').textContent = '';
       $('revealBox').textContent = '';
-      $('arenaStatus').textContent = pair.randomPair
-        ? 'Generating round with a hidden random method pair...'
-        : 'Generating round...';
+      $('arenaStatus').textContent = 'Generating round...';
       $('leftMeta').textContent = '';
       $('rightMeta').textContent = '';
       $('leftText').textContent = 'Generating...';
@@ -1540,7 +1794,7 @@
       $('revealBox').innerHTML =
         `Left uses <strong>${leftMethod}</strong> | Right uses <strong>${rightMethod}</strong><br>` +
         `Current winner: <strong>${winner[0]}</strong> (${winner[1]} votes) · ` +
-        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam Search']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']}`;
+        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam Search']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']} | Sampling ${methodWins['Pure Sampling']}`;
 
       if (arenaRound >= MAX_ARENA_ROUNDS - 1) {
         arenaFinished = true;
@@ -1551,9 +1805,34 @@
       }
     }
 
+    function resetArenaState(message) {
+      round = 0;
+      arenaRound = 0;
+      score = 0;
+      roundPicked = false;
+      arenaFinished = false;
+      Object.keys(methodWins).forEach((k) => { methodWins[k] = 0; });
+      $('scoreNum').textContent = '0';
+      $('roundNum').textContent = '1';
+      $('roundResult').textContent = '';
+      $('revealBox').textContent = '';
+      $('arenaStatus').textContent = message;
+      $('leftText').textContent = '';
+      $('rightText').textContent = '';
+      $('leftMeta').textContent = '';
+      $('rightMeta').textContent = '';
+      $('nextRound').disabled = false;
+      $('genRound').disabled = false;
+      $('pickLeft').disabled = false;
+      $('pickRight').disabled = false;
+    }
+
     $('pickLeft').addEventListener('click', () => evaluatePick(true));
     $('pickRight').addEventListener('click', () => evaluatePick(false));
     $('genRound').addEventListener('click', loadRound);
+    $('arenaPair').addEventListener('change', () => {
+      resetArenaState('Method pair changed. Generate round 1.');
+    });
     $('nextRound').addEventListener('click', () => {
       if (arenaFinished) return;
       if (!roundPicked) {
@@ -1566,26 +1845,107 @@
       loadRound();
     });
     $('restartArena').addEventListener('click', () => {
-      round = 0;
-      arenaRound = 0;
-      score = 0;
-      roundPicked = false;
-      arenaFinished = false;
-      Object.keys(methodWins).forEach((k) => { methodWins[k] = 0; });
-      $('scoreNum').textContent = '0';
-      $('roundNum').textContent = '1';
-      $('roundResult').textContent = '';
-      $('revealBox').textContent = '';
-      $('arenaStatus').textContent = 'Arena reset. Generate round 1.';
-      $('leftText').textContent = '';
-      $('rightText').textContent = '';
-      $('leftMeta').textContent = '';
-      $('rightMeta').textContent = '';
-      $('nextRound').disabled = false;
-      $('genRound').disabled = false;
-      $('pickLeft').disabled = false;
-      $('pickRight').disabled = false;
+      resetArenaState('Arena reset. Generate round 1.');
     });
+
+    async function generateWatermarked() {
+      const statusEl = $('wmStatus');
+      const outEl = $('wmOutput');
+      const outPlainEl = $('wmOutputPlain');
+      const metricsEl = $('wmMetrics');
+      $('wmGenerate').disabled = true;
+      statusEl.textContent = 'Generating with KGW watermark...';
+      outEl.textContent = 'Generating...';
+      outPlainEl.textContent = 'Generating...';
+      outEl.classList.add('generating');
+      outPlainEl.classList.add('generating');
+      metricsEl.innerHTML = '';
+      try {
+        const body = {
+          model: apiConfig().model,
+          prompt: ($('wmPrompt').value || '').trim() || "So what's new in my life?",
+          strategy: $('wmStrategy').value,
+          max_tokens: Number($('wmMaxTokens').value),
+          temperature: Number($('wmTemp').value),
+          top_p: Number($('wmTopP').value),
+          top_k: Number($('wmTopK').value),
+          gamma: Number($('wmGamma').value),
+          delta: Number($('wmDelta').value),
+          seeding_key: Number(($('wmKey').value || '15485863').trim()) || 15485863,
+        };
+        const res = await fetch('/api/local/watermark/completions_stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
+        if (!res.body) throw new Error('Streaming response body unavailable.');
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let wmHtml = '';
+        let plainHtml = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+          while (true) {
+            const splitAt = buffer.indexOf('\n\n');
+            if (splitAt === -1) break;
+            const packet = buffer.slice(0, splitAt);
+            buffer = buffer.slice(splitAt + 2);
+            for (const line of packet.split('\n')) {
+              if (!line.startsWith('data: ')) continue;
+              const payload = JSON.parse(line.slice(6));
+              if (payload.type === 'status') {
+                statusEl.textContent = payload.message || statusEl.textContent;
+              } else if (payload.type === 'delta_wm') {
+                const cls = payload.green ? 'green' : 'red';
+                wmHtml += `<span class="wm-token ${cls}">${escapeHtml(payload.text || '')}</span>`;
+                outEl.innerHTML = wmHtml;
+              } else if (payload.type === 'delta_plain') {
+                const cls = payload.green ? 'green' : 'red';
+                plainHtml += `<span class="wm-token ${cls}">${escapeHtml(payload.text || '')}</span>`;
+                outPlainEl.innerHTML = plainHtml;
+              } else if (payload.type === 'done') {
+                const wm = payload.wm || {};
+                const plain = payload.plain || {};
+                const metrics = [];
+                if (wm.tokens != null && wm.green_tokens != null) {
+                  const rate = wm.tokens ? (100 * wm.green_tokens / wm.tokens) : 0;
+                  metrics.push(`WM green ${wm.green_tokens}/${wm.tokens} (${rate.toFixed(1)}%)`);
+                }
+                if (plain.tokens != null && plain.green_tokens != null) {
+                  const rate = plain.tokens ? (100 * plain.green_tokens / plain.tokens) : 0;
+                  metrics.push(`Plain green ${plain.green_tokens}/${plain.tokens} (${rate.toFixed(1)}%)`);
+                }
+                if (wm.tokens_per_second != null) metrics.push(`WM Tok/s ${Number(wm.tokens_per_second).toFixed(1)}`);
+                if (plain.tokens_per_second != null) metrics.push(`Plain Tok/s ${Number(plain.tokens_per_second).toFixed(1)}`);
+                metricsEl.innerHTML = metrics.map((m) => `<span class="metric">${m}</span>`).join('');
+                statusEl.textContent = 'Watermarked generation complete.';
+                try { await reader.cancel(); } catch (_) {}
+                break;
+              } else if (payload.type === 'error') {
+                throw new Error(payload.error || 'Watermark streaming failed.');
+              }
+            }
+          }
+        }
+      } catch (err) {
+          statusEl.textContent = `Failed: ${err.message}`;
+          statusEl.classList.add('error');
+        outEl.textContent = '';
+        outPlainEl.textContent = '';
+      } finally {
+        outEl.classList.remove('generating');
+        outPlainEl.classList.remove('generating');
+        $('wmGenerate').disabled = false;
+      }
+    }
+
+    $('wmGenerate').addEventListener('click', generateWatermarked);
 
     const tailChartEl = $('tailChart');
     let distTokens = [];
@@ -1625,6 +1985,25 @@
         .replace(/\n/g, '\\n')
         .replace(/\t/g, '\\t')
         .replace(/ /g, '.');
+    }
+
+    function nextTokenParamHint() {
+      const strategy = $('nextTokenStrategy').value;
+      const temperature = 0.9;
+      const topP = Number($('pCut').value);
+      const topK = Number($('kCut').value);
+      if (strategy === 'beam') return 'Using Beam Search with b=4';
+      if (strategy === 'topk') return `Using Top-k with k=${topK}`;
+      if (strategy === 'topp') return `Using Top-p with p=${topP.toFixed(2)}`;
+      if (strategy === 'sample') return `Using Pure Sampling with temp=${temperature.toFixed(2)}`;
+      if (strategy === 'chart_click') return 'Using Chart Click with selected token';
+      return 'Using Greedy decoding';
+    }
+
+    function updateNextStrategyHint() {
+      const el = $('nextStrategyHint');
+      if (!el) return;
+      el.textContent = nextTokenParamHint();
     }
 
     function drawChartMessage(message) {
@@ -1770,7 +2149,7 @@
           annotations: [
             {
               x: kBoundaryX,
-              y: yMax * 0.92,
+              y: yMax * 0.95,
               text: k <= x.length ? `Top-k boundary (k=${k})` : `Top-k boundary (k=${k}, off-chart)`,
               showarrow: false,
               font: { size: 11, color: topKLine },
@@ -1878,10 +2257,12 @@
         const temperature = 0.9;
         const topP = Number($('pCut').value);
         const topK = Number($('kCut').value);
+        const beamSize = 4;
         const body = {
           model: apiConfig().model,
           prompt,
           max_tokens: 1,
+          strategy,
         };
         if (strategy === 'greedy') {
           body.temperature = 0;
@@ -1889,19 +2270,26 @@
         } else if (strategy === 'beam') {
           body.temperature = 0;
           body.top_p = 1;
-          body.beam_size = 4;
+          body.beam_size = Math.max(1, beamSize || 4);
         } else if (strategy === 'topk') {
           body.temperature = temperature;
           body.top_p = 1;
           body.top_k = topK;
+        } else if (strategy === 'sample') {
+          body.temperature = temperature;
+          body.top_p = 1;
         } else if (strategy === 'topp') {
           body.temperature = temperature;
           body.top_p = topP;
+        } else if (strategy !== 'chart_click') {
+          throw new Error(`Unsupported strategy: ${strategy}`);
         }
         let token = '';
         if (strategy === 'chart_click') {
           token = selectedChartToken;
           if (!token) throw new Error('Select a token from the chart first.');
+          selectedChartToken = '';
+          $('selectedTokenStatus').textContent = 'Selection consumed. Click a new token on the chart.';
         } else {
           const res = await fetch('/api/local/completions', {
             method: 'POST',
@@ -1918,9 +2306,16 @@
         const strategyName =
           strategy === 'chart_click' ? 'chart-click' :
           strategy === 'beam' ? 'beam-search' :
+          strategy === 'sample' ? 'pure-sampling' :
           strategy === 'topp' ? 'top-p' :
           strategy === 'topk' ? 'top-k' : 'greedy';
-        $('nextTokenStatus').textContent = `Added token (${strategyName}): ${safeTokenLabel(token)}`;
+        const strategyParams =
+          strategy === 'beam' ? `b=${body.beam_size}` :
+          strategy === 'topk' ? `k=${topK}, temp=${temperature.toFixed(2)}` :
+          strategy === 'topp' ? `p=${topP.toFixed(2)}, temp=${temperature.toFixed(2)}` :
+          strategy === 'sample' ? `temp=${temperature.toFixed(2)}` :
+          strategy === 'chart_click' ? 'manual chart token' : 'deterministic';
+        $('nextTokenStatus').textContent = `Added token (${strategyName}; ${strategyParams}): ${safeTokenLabel(token)}`;
         await fetchRealDistribution();
       } catch (err) {
         $('nextTokenStatus').textContent = `Failed: ${err.message}`;
@@ -1933,7 +2328,10 @@
     $('undoToken').addEventListener('click', undoLastToken);
     $('distPrompt').addEventListener('input', () => scheduleDistRefresh(450));
     $('kCut').addEventListener('input', drawDistribution);
+    $('nextTokenStrategy').addEventListener('change', updateNextStrategyHint);
     $('pCut').addEventListener('input', () => scheduleDistRefresh(220));
+    $('pCut').addEventListener('input', updateNextStrategyHint);
+    $('kCut').addEventListener('input', updateNextStrategyHint);
     $('distN').addEventListener('change', fetchRealDistribution);
     window.addEventListener('resize', drawDistribution);
 
@@ -1941,6 +2339,7 @@
     updateSampleTitle('b');
     updateMethodControls('a');
     updateMethodControls('b');
+    updateWmControls();
     try {
       const savedTheme = localStorage.getItem('decoding_theme') || 'forest';
       $('themeSelect').value = savedTheme;
@@ -1950,7 +2349,8 @@
     }
     $('arenaStatus').textContent = 'Ready.';
     $('distStatus').textContent = 'Ready.';
-    drawChartMessage('Click "Preload Model" or open this tab to load distribution.');
+    updateNextStrategyHint();
+    drawChartMessage('Click "Load Model" or open this tab to load distribution.');
 
     checkApiServer();
     setTimeout(() => { $('preloadModel').click(); }, 0);

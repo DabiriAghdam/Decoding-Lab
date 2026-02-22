@@ -33,6 +33,9 @@ else:
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8000"))
 DIST_CACHE_MAX_ENTRIES = int(os.environ.get("DIST_CACHE_MAX_ENTRIES", "128"))
+TOP_K_MAX = 320
+ALLOWED_DECODE_STRATEGIES = {"greedy", "beam", "topk", "topp", "sample"}
+ALLOWED_SAMPLING_STRATEGIES = {"greedy", "topk", "topp", "sample"}
 
 
 MODEL_CACHE = {}
@@ -74,6 +77,7 @@ def _load_runtime(model_id):
         "dist_cache": {},
         "dist_cache_order": [],
         "dist_cache_lock": threading.Lock(),
+        "vocab_ids_cache": {},
     }
     with CACHE_LOCK:
         MODEL_CACHE[model_id] = runtime
@@ -109,7 +113,119 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
         self.wfile.flush()
 
-    def _generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1):
+    def _parse_decode_request(
+        self,
+        body,
+        default_max_tokens=120,
+        allowed_strategies=None,
+    ):
+        allowed = allowed_strategies or ALLOWED_DECODE_STRATEGIES
+        strategy = body.get("strategy")
+        strategy = strategy.strip().lower() if isinstance(strategy, str) else ""
+        if strategy not in allowed:
+            supported = ", ".join(sorted(allowed))
+            raise ValueError(f"strategy is required and must be one of: {supported}")
+        return {
+            "max_tokens": body.get("max_tokens", default_max_tokens),
+            "temperature": body.get("temperature"),
+            "top_p": body.get("top_p"),
+            "top_k": body.get("top_k"),
+            "beam_size": body.get("beam_size", 1),
+            "strategy": strategy,
+        }
+
+    def _normalize_decoding_params(self, strategy, temperature, top_p, top_k, beam_size):
+        strategy = (strategy or "").strip().lower()
+        if strategy not in ALLOWED_DECODE_STRATEGIES:
+            raise ValueError("Unsupported strategy")
+        normalized = {"strategy": strategy, "beam_size": max(1, int(beam_size or 1))}
+
+        if strategy == "greedy":
+            normalized["temperature"] = 0.0
+            normalized["top_p"] = 1.0
+            normalized["top_k"] = 0
+            normalized["beam_size"] = 1
+        elif strategy == "beam":
+            normalized["temperature"] = 0.0
+            normalized["top_p"] = 1.0
+            normalized["top_k"] = 0
+            normalized["beam_size"] = max(1, normalized["beam_size"])
+        elif strategy == "topk":
+            if temperature is None:
+                raise ValueError("temperature is required for top-k strategy")
+            if top_k is None:
+                raise ValueError("top_k is required for top-k strategy")
+            normalized["temperature"] = float(temperature)
+            if normalized["temperature"] <= 0.0:
+                raise ValueError("temperature must be > 0 for top-k strategy")
+            normalized["top_k"] = int(top_k)
+            if normalized["top_k"] < 1:
+                raise ValueError("top_k must be >= 1 for top-k strategy")
+            if normalized["top_k"] > TOP_K_MAX:
+                raise ValueError(f"top_k must be <= {TOP_K_MAX} for top-k strategy")
+            normalized["top_p"] = 1.0
+            normalized["beam_size"] = 1
+        elif strategy == "topp":
+            if temperature is None:
+                raise ValueError("temperature is required for top-p strategy")
+            if top_p is None:
+                raise ValueError("top_p is required for top-p strategy")
+            normalized["temperature"] = float(temperature)
+            if normalized["temperature"] <= 0.0:
+                raise ValueError("temperature must be > 0 for top-p strategy")
+            normalized["top_p"] = float(top_p)
+            if not (0.1 <= normalized["top_p"] <= 1.0):
+                raise ValueError("top_p must be in [0.1, 1] for top-p strategy")
+            normalized["top_k"] = 0
+            normalized["beam_size"] = 1
+        else:  # sample
+            if temperature is None:
+                raise ValueError("temperature is required for sample strategy")
+            normalized["temperature"] = float(temperature)
+            normalized["top_p"] = 1.0
+            normalized["top_k"] = 0
+            normalized["beam_size"] = 1
+
+        return normalized
+
+    def _build_hf_generate_kwargs(self, tokenizer, max_tokens, decoding, streamer=None):
+        kwargs = {
+            "max_new_tokens": max_tokens,
+            "pad_token_id": tokenizer.pad_token_id,
+        }
+        if streamer is not None:
+            kwargs["streamer"] = streamer
+
+        if decoding["strategy"] == "beam":
+            kwargs.update(
+                {
+                    "do_sample": False,
+                    "num_beams": decoding["beam_size"],
+                    "early_stopping": True,
+                }
+            )
+            return kwargs
+
+        if decoding["strategy"] in {"topk", "topp", "sample"}:
+            # In the limit temp->0, pure sampling should match greedy behavior.
+            if decoding["strategy"] == "sample" and decoding["temperature"] <= 0.0001:
+                kwargs["do_sample"] = False
+                return kwargs
+            kwargs.update(
+                {
+                    "do_sample": True,
+                    "temperature": decoding["temperature"],
+                    # Explicitly set both to avoid GenerationConfig defaults (e.g., top_k=50).
+                    "top_k": decoding["top_k"],
+                    "top_p": decoding["top_p"],
+                }
+            )
+            return kwargs
+
+        kwargs["do_sample"] = False
+        return kwargs
+
+    def _generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1, strategy=None):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
         device = runtime["device"]
@@ -121,36 +237,14 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             attention_mask = attention_mask.to(device)
 
         max_tokens = max(1, min(int(max_tokens), 200))
-        temperature = float(temperature)
-        top_p = float(top_p)
-        top_k = int(top_k) if top_k is not None else 0
-
-        beam_size = max(1, int(beam_size or 1))
-        do_sample = (temperature > 0.0001) and beam_size == 1
-        gen_kwargs = {
-            "max_new_tokens": max_tokens,
-            "pad_token_id": tokenizer.pad_token_id,
-        }
-        if beam_size > 1:
-            gen_kwargs.update(
-                {
-                    "do_sample": False,
-                    "num_beams": beam_size,
-                    "early_stopping": True,
-                }
-            )
-        elif do_sample:
-            gen_kwargs.update(
-                {
-                    "do_sample": True,
-                    "temperature": max(temperature, 0.05),
-                    "top_p": min(max(top_p, 0.01), 1.0),
-                }
-            )
-            if top_k > 0:
-                gen_kwargs["top_k"] = top_k
-        else:
-            gen_kwargs.update({"do_sample": False})
+        decoding = self._normalize_decoding_params(
+            strategy=strategy,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            beam_size=beam_size,
+        )
+        gen_kwargs = self._build_hf_generate_kwargs(tokenizer, max_tokens, decoding)
 
         started = time.perf_counter()
         with torch.inference_mode():
@@ -172,7 +266,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             "tokens_per_second": float(completion_tokens / elapsed_s),
         }
 
-    def _stream_generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1):
+    def _stream_generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1, strategy=None):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
         device = runtime["device"]
@@ -184,44 +278,53 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             attention_mask = attention_mask.to(device)
 
         max_tokens = max(1, min(int(max_tokens), 200))
-        temperature = float(temperature)
-        top_p = float(top_p)
-        top_k = int(top_k) if top_k is not None else 0
-        beam_size = max(1, int(beam_size or 1))
-        do_sample = (temperature > 0.0001) and beam_size == 1
+        decoding = self._normalize_decoding_params(
+            strategy=strategy,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            beam_size=beam_size,
+        )
+
+        if decoding["strategy"] == "beam":
+            # HF streamer + beam search may not emit incremental deltas reliably.
+            gen_kwargs = self._build_hf_generate_kwargs(tokenizer, max_tokens, decoding)
+            gen_kwargs["input_ids"] = input_ids
+            gen_kwargs["attention_mask"] = attention_mask
+
+            started = time.perf_counter()
+            with torch.inference_mode():
+                output = model.generate(**gen_kwargs)
+            elapsed_s = max(time.perf_counter() - started, 1e-6)
+            new_ids = output[0][input_ids.shape[1] :]
+            completion_text = tokenizer.decode(new_ids, skip_special_tokens=True)
+            completion_tokens = int(new_ids.shape[0])
+            prompt_tokens = int(input_ids.shape[1])
+
+            if completion_text:
+                yield {"type": "delta", "text": completion_text}
+            yield {
+                "type": "done",
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": prompt_tokens + completion_tokens,
+                },
+                "performance": {
+                    "elapsed_ms": int(round(elapsed_s * 1000)),
+                    "tokens_per_second": float(completion_tokens / elapsed_s) if completion_tokens > 0 else 0.0,
+                },
+            }
+            return
 
         streamer = TextIteratorStreamer(
             tokenizer,
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False,
         )
-        gen_kwargs = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "max_new_tokens": max_tokens,
-            "pad_token_id": tokenizer.pad_token_id,
-            "streamer": streamer,
-        }
-        if beam_size > 1:
-            gen_kwargs.update(
-                {
-                    "do_sample": False,
-                    "num_beams": beam_size,
-                    "early_stopping": True,
-                }
-            )
-        elif do_sample:
-            gen_kwargs.update(
-                {
-                    "do_sample": True,
-                    "temperature": max(temperature, 0.05),
-                    "top_p": min(max(top_p, 0.01), 1.0),
-                }
-            )
-            if top_k > 0:
-                gen_kwargs["top_k"] = top_k
-        else:
-            gen_kwargs["do_sample"] = False
+        gen_kwargs = self._build_hf_generate_kwargs(tokenizer, max_tokens, decoding, streamer=streamer)
+        gen_kwargs["input_ids"] = input_ids
+        gen_kwargs["attention_mask"] = attention_mask
 
         produced = []
         worker_error = {}
@@ -313,7 +416,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         top_n = min(top_n, vocab_size)
         top_k = max(1, min(int(top_k or 20), vocab_size))
         top_p = float(top_p if top_p is not None else 0.9)
-        top_p = min(max(top_p, 0.01), 1.0)
+        top_p = min(max(top_p, 0.1), 1.0)
 
         cumulative = torch.cumsum(sorted_probs, dim=-1)
         top_p_rank = int(torch.searchsorted(cumulative, torch.tensor(top_p), right=False).item() + 1)
@@ -342,6 +445,251 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             "vocab_size": vocab_size,
         }
 
+    def _sample_from_logits(self, logits, strategy, temperature, top_p, top_k):
+        strategy = (strategy or "").strip().lower()
+        if strategy not in ALLOWED_SAMPLING_STRATEGIES:
+            raise ValueError("Unsupported strategy")
+        if strategy == "greedy":
+            return int(torch.argmax(logits).item())
+        if strategy == "sample" and float(temperature) <= 0.0001:
+            return int(torch.argmax(logits).item())
+
+        temp = max(float(temperature), 0.05)
+        probs = torch.softmax(logits / temp, dim=-1)
+        vocab_size = int(probs.shape[0])
+
+        if strategy == "sample":
+            return int(torch.multinomial(probs, 1).item())
+
+        if strategy == "topk":
+            if top_k is None:
+                raise ValueError("top_k is required for top-k strategy")
+            k = max(1, min(int(top_k), vocab_size))
+            topk_probs, topk_idx = torch.topk(probs, k)
+            denom = torch.sum(topk_probs)
+            if float(denom.item()) <= 0:
+                return int(topk_idx[0].item())
+            topk_probs = topk_probs / denom
+            sample_idx = int(torch.multinomial(topk_probs, 1).item())
+            return int(topk_idx[sample_idx].item())
+
+        if top_p is None:
+            raise ValueError("top_p is required for top-p strategy")
+        p = min(max(float(top_p), 0.1), 1.0)
+        sorted_probs, sorted_idx = torch.sort(probs, descending=True)
+        cumulative = torch.cumsum(sorted_probs, dim=-1)
+        remove_mask = cumulative > p
+        # Keep the first token above threshold so nucleus mass is >= p.
+        remove_mask[1:] = remove_mask[:-1].clone()
+        remove_mask[0] = False
+        filtered = sorted_probs.masked_fill(remove_mask, 0.0)
+        denom = torch.sum(filtered)
+        if float(denom.item()) <= 0:
+            return int(sorted_idx[0].item())
+        filtered = filtered / denom
+        sample_idx = int(torch.multinomial(filtered, 1).item())
+        return int(sorted_idx[sample_idx].item())
+
+    def _kgw_seed(self, prev_token_id, seeding_key):
+        prev_tok = int(prev_token_id) & 0xFFFFFFFF
+        key = int(seeding_key) & 0xFFFFFFFF
+        return ((prev_tok * 2654435761) ^ (key * 2246822519)) & 0xFFFFFFFF
+
+    def _kgw_green_mask(self, runtime, vocab_size, seed, gamma, device):
+        key = f"{device}:{vocab_size}"
+        ids = runtime["vocab_ids_cache"].get(key)
+        if ids is None or int(ids.shape[0]) != int(vocab_size):
+            ids = torch.arange(vocab_size, dtype=torch.int64, device=device)
+            runtime["vocab_ids_cache"][key] = ids
+
+        seed_t = torch.full_like(ids, int(seed), dtype=torch.int64)
+        x = torch.bitwise_xor(ids, seed_t)
+        x = torch.bitwise_and(x * 0x9E3779B1, 0xFFFFFFFF)
+        x = torch.bitwise_xor(x, torch.bitwise_right_shift(x, 16))
+        x = torch.bitwise_and(x * 0x85EBCA77, 0xFFFFFFFF)
+        x = torch.bitwise_xor(x, torch.bitwise_right_shift(x, 13))
+        threshold = int(min(max(float(gamma), 0.01), 0.99) * 4294967295.0)
+        return x <= threshold
+
+    def _generate_kgw_watermarked(
+        self,
+        runtime,
+        prompt,
+        max_tokens,
+        strategy,
+        temperature,
+        top_p,
+        top_k,
+        gamma,
+        delta,
+        seeding_key,
+    ):
+        tokenizer = runtime["tokenizer"]
+        model = runtime["model"]
+        device = runtime["device"]
+
+        inputs = tokenizer(prompt, return_tensors="pt")
+        input_ids = inputs["input_ids"].to(device)
+        attention_mask = inputs.get("attention_mask")
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(device)
+        else:
+            attention_mask = torch.ones_like(input_ids, device=device)
+
+        max_tokens = max(1, min(int(max_tokens), 200))
+        gamma = min(max(float(gamma), 0.01), 0.99)
+        delta = float(delta)
+
+        generated = []
+        token_meta = []
+        started = time.perf_counter()
+        eos_id = tokenizer.eos_token_id
+
+        with torch.inference_mode():
+            for _ in range(max_tokens):
+                logits = model(input_ids=input_ids, attention_mask=attention_mask).logits[0, -1, :]
+                prev_token = int(input_ids[0, -1].item())
+                seed = self._kgw_seed(prev_token, seeding_key)
+                green_mask = self._kgw_green_mask(runtime, int(logits.shape[0]), seed, gamma, device)
+                adjusted = logits + green_mask.to(logits.dtype) * delta
+
+                next_token = self._sample_from_logits(
+                    logits=adjusted,
+                    strategy=strategy,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                )
+                generated.append(next_token)
+                is_green = bool(green_mask[next_token].item())
+                tok_text = tokenizer.decode([next_token], clean_up_tokenization_spaces=False)
+                token_meta.append({"id": int(next_token), "text": tok_text, "green": is_green})
+
+                next_tok = torch.tensor([[next_token]], dtype=input_ids.dtype, device=device)
+                input_ids = torch.cat([input_ids, next_tok], dim=1)
+                attention_mask = torch.cat([attention_mask, torch.ones((1, 1), dtype=attention_mask.dtype, device=device)], dim=1)
+                if eos_id is not None and next_token == int(eos_id):
+                    break
+
+        elapsed_s = max(time.perf_counter() - started, 1e-6)
+        text = tokenizer.decode(generated, skip_special_tokens=True)
+        completion_tokens = len(generated)
+        prompt_tokens = int(inputs["input_ids"].shape[1])
+        return {
+            "text": text,
+            "tokens": token_meta,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "elapsed_ms": int(round(elapsed_s * 1000)),
+            "tokens_per_second": float(completion_tokens / elapsed_s) if completion_tokens > 0 else 0.0,
+        }
+
+    def _stream_kgw_and_plain(
+        self,
+        runtime,
+        prompt,
+        max_tokens,
+        strategy,
+        temperature,
+        top_p,
+        top_k,
+        gamma,
+        delta,
+        seeding_key,
+    ):
+        tokenizer = runtime["tokenizer"]
+        model = runtime["model"]
+        device = runtime["device"]
+
+        max_tokens = max(1, min(int(max_tokens), 200))
+        gamma = min(max(float(gamma), 0.01), 0.99)
+        delta = float(delta)
+        eos_id = tokenizer.eos_token_id
+        inputs = tokenizer(prompt, return_tensors="pt")
+        base_ids = inputs["input_ids"].to(device)
+        base_mask = inputs.get("attention_mask")
+        if base_mask is not None:
+            base_mask = base_mask.to(device)
+        else:
+            base_mask = torch.ones_like(base_ids, device=device)
+
+        def run_one_stream(apply_watermark):
+            input_ids = base_ids
+            attention_mask = base_mask
+            prev_tok = int(base_ids[0, -1].item())
+            past_key_values = None
+            gen_count = 0
+            gen_green = 0
+
+            with torch.inference_mode():
+                for _ in range(max_tokens):
+                    out = model(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        use_cache=True,
+                        past_key_values=past_key_values,
+                    )
+                    logits = out.logits[0, -1, :]
+                    past_key_values = out.past_key_values
+
+                    seed = self._kgw_seed(prev_tok, seeding_key)
+                    green_mask = self._kgw_green_mask(runtime, int(logits.shape[0]), seed, gamma, device)
+                    decode_logits = logits + green_mask.to(logits.dtype) * delta if apply_watermark else logits
+                    next_tok = self._sample_from_logits(
+                        logits=decode_logits,
+                        strategy=strategy,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                    )
+                    is_green = bool(green_mask[next_tok].item())
+                    gen_green += int(is_green)
+                    gen_count += 1
+                    tok_text = tokenizer.decode([next_tok], clean_up_tokenization_spaces=False)
+                    yield next_tok, tok_text, is_green, gen_count, gen_green
+
+                    prev_tok = int(next_tok)
+                    input_ids = torch.tensor([[next_tok]], dtype=base_ids.dtype, device=device)
+                    attention_mask = torch.cat(
+                        [attention_mask, torch.ones((1, 1), dtype=attention_mask.dtype, device=device)],
+                        dim=1,
+                    )
+                    if eos_id is not None and next_tok == int(eos_id):
+                        break
+
+        started = time.perf_counter()
+        wm_count = 0
+        wm_green = 0
+        plain_count = 0
+        plain_green = 0
+
+        yield {"type": "status", "message": "streaming_watermarked"}
+        for _, tok_text, is_green, gen_count, gen_green in run_one_stream(True):
+            wm_count = gen_count
+            wm_green = gen_green
+            yield {"type": "delta_wm", "text": tok_text, "green": is_green}
+
+        yield {"type": "status", "message": "streaming_plain"}
+        for _, tok_text, is_green, gen_count, gen_green in run_one_stream(False):
+            plain_count = gen_count
+            plain_green = gen_green
+            yield {"type": "delta_plain", "text": tok_text, "green": is_green}
+
+        elapsed_s = max(time.perf_counter() - started, 1e-6)
+        yield {
+            "type": "done",
+            "wm": {
+                "tokens": wm_count,
+                "green_tokens": wm_green,
+                "tokens_per_second": float(wm_count / elapsed_s) if wm_count > 0 else 0.0,
+            },
+            "plain": {
+                "tokens": plain_count,
+                "green_tokens": plain_green,
+                "tokens_per_second": float(plain_count / elapsed_s) if plain_count > 0 else 0.0,
+            },
+        }
+
     def do_OPTIONS(self):
         if self.path.startswith("/api/"):
             self.send_response(204)
@@ -362,8 +710,9 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         tp = body.get("top_p")
         tm = body.get("temperature")
         tk = body.get("top_k")
+        st = body.get("strategy")
         print(
-            f"[POST] {self.path} model={model_for_log} max_tokens={mt} temp={tm} top_p={tp} top_k={tk}",
+            f"[POST] {self.path} model={model_for_log} strategy={st} max_tokens={mt} temp={tm} top_p={tp} top_k={tk}",
             flush=True,
         )
 
@@ -395,14 +744,11 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
 
             try:
                 runtime = _load_runtime(model_id)
+                params = self._parse_decode_request(body)
                 gen = self._generate(
                     runtime=runtime,
                     prompt=prompt,
-                    max_tokens=body.get("max_tokens", 120),
-                    temperature=body.get("temperature", 0.9),
-                    top_p=body.get("top_p", 1.0),
-                    top_k=body.get("top_k"),
-                    beam_size=body.get("beam_size", 1),
+                    **params,
                 )
                 payload = {
                     "id": f"local-{int(time.time() * 1000)}",
@@ -437,6 +783,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             self._send_sse({"type": "status", "message": "loading_runtime"})
             try:
                 runtime = _load_runtime(model_id)
+                params = self._parse_decode_request(body)
                 self._send_sse(
                     {
                         "type": "status",
@@ -447,11 +794,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                 for event in self._stream_generate(
                     runtime=runtime,
                     prompt=prompt,
-                    max_tokens=body.get("max_tokens", 120),
-                    temperature=body.get("temperature", 0.9),
-                    top_p=body.get("top_p", 1.0),
-                    top_k=body.get("top_k"),
-                    beam_size=body.get("beam_size", 1),
+                    **params,
                 ):
                     self._send_sse(event)
                 self.close_connection = True
@@ -492,6 +835,105 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                         "top_k_rank": dist["top_k_rank"],
                         "top_p_rank": dist["top_p_rank"],
                         "vocab_size": dist["vocab_size"],
+                    },
+                )
+            except Exception as exc:
+                self._send_json(500, {"error": str(exc)})
+            return
+
+        if self.path == "/api/local/watermark/completions_stream":
+            model_id = _normalize_model_id(body.get("model"))
+            prompt = body.get("prompt")
+            if not prompt:
+                self._send_json(400, {"error": "prompt is required"})
+                return
+            self._start_sse()
+            self._send_sse({"type": "status", "message": "loading_runtime"})
+            try:
+                params = self._parse_decode_request(
+                    body,
+                    default_max_tokens=80,
+                    allowed_strategies=ALLOWED_SAMPLING_STRATEGIES,
+                )
+                decoded = self._normalize_decoding_params(
+                    strategy=params["strategy"],
+                    temperature=params["temperature"],
+                    top_p=params["top_p"],
+                    top_k=params["top_k"],
+                    beam_size=1,
+                )
+                runtime = _load_runtime(model_id)
+                self._send_sse({"type": "status", "message": "runtime_ready", "device": runtime["device"]})
+                for event in self._stream_kgw_and_plain(
+                    runtime=runtime,
+                    prompt=prompt,
+                    max_tokens=params["max_tokens"],
+                    strategy=decoded["strategy"],
+                    temperature=decoded["temperature"],
+                    top_p=decoded["top_p"],
+                    top_k=decoded["top_k"],
+                    gamma=body.get("gamma", 0.25),
+                    delta=body.get("delta", 2.0),
+                    seeding_key=body.get("seeding_key", 15485863),
+                ):
+                    self._send_sse(event)
+                self.close_connection = True
+            except Exception as exc:
+                try:
+                    self._send_sse({"type": "error", "error": str(exc)})
+                except Exception:
+                    pass
+            return
+
+        if self.path == "/api/local/watermark/completions":
+            model_id = _normalize_model_id(body.get("model"))
+            prompt = body.get("prompt")
+            if not prompt:
+                self._send_json(400, {"error": "prompt is required"})
+                return
+            try:
+                params = self._parse_decode_request(
+                    body,
+                    default_max_tokens=80,
+                    allowed_strategies=ALLOWED_SAMPLING_STRATEGIES,
+                )
+                decoded = self._normalize_decoding_params(
+                    strategy=params["strategy"],
+                    temperature=params["temperature"],
+                    top_p=params["top_p"],
+                    top_k=params["top_k"],
+                    beam_size=1,
+                )
+                runtime = _load_runtime(model_id)
+                gen = self._generate_kgw_watermarked(
+                    runtime=runtime,
+                    prompt=prompt,
+                    max_tokens=params["max_tokens"],
+                    strategy=decoded["strategy"],
+                    temperature=decoded["temperature"],
+                    top_p=decoded["top_p"],
+                    top_k=decoded["top_k"],
+                    gamma=body.get("gamma", 0.25),
+                    delta=body.get("delta", 2.0),
+                    seeding_key=body.get("seeding_key", 15485863),
+                )
+                self._send_json(
+                    200,
+                    {
+                        "id": f"wm-{int(time.time() * 1000)}",
+                        "object": "watermarked_completion",
+                        "model": model_id,
+                        "choices": [{"index": 0, "text": gen["text"], "finish_reason": "stop"}],
+                        "tokens": gen["tokens"],
+                        "usage": {
+                            "prompt_tokens": gen["prompt_tokens"],
+                            "completion_tokens": gen["completion_tokens"],
+                            "total_tokens": gen["prompt_tokens"] + gen["completion_tokens"],
+                        },
+                        "performance": {
+                            "elapsed_ms": gen["elapsed_ms"],
+                            "tokens_per_second": gen["tokens_per_second"],
+                        },
                     },
                 )
             except Exception as exc:
