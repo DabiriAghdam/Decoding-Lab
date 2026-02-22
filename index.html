@@ -1654,6 +1654,7 @@
     let arenaRound = 0;
     let roundPicked = false;
     let arenaFinished = false;
+    const randomRoundCache = {};
     let leftMethod = 'Top-p (Nucleus)';
     let rightMethod = 'Greedy';
     const methodWins = {
@@ -1752,8 +1753,19 @@
     async function loadRound() {
       if (arenaFinished) return;
       const prompt = arenaPrompts[round];
-      const pair = arenaPairConfigs(prompt);
-      const leftIsPrimary = Math.random() > 0.5;
+      const mode = $('arenaPair').value;
+      let pair = arenaPairConfigs(prompt);
+      let leftIsPrimary = Math.random() > 0.5;
+
+      if (mode === 'random_blind') {
+        const cached = randomRoundCache[arenaRound];
+        if (cached) {
+          pair = cached.pair;
+          leftIsPrimary = cached.leftIsPrimary;
+        } else {
+          randomRoundCache[arenaRound] = { pair, leftIsPrimary };
+        }
+      }
 
       roundPicked = false;
       $('pickLeft').disabled = false;
@@ -1841,6 +1853,7 @@
       score = 0;
       roundPicked = false;
       arenaFinished = false;
+      Object.keys(randomRoundCache).forEach((k) => { delete randomRoundCache[k]; });
       Object.keys(methodWins).forEach((k) => { methodWins[k] = 0; });
       $('scoreNum').textContent = '0';
       $('roundNum').textContent = '1';
