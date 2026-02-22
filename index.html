@@ -619,6 +619,19 @@
       overflow-y: auto;
     }
 
+    .wm-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .wm-col h4 {
+      margin: 0 0 6px 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+      letter-spacing: 0.01em;
+    }
+
     .wm-token {
       display: inline-block;
       margin: 2px 3px 2px 0;
@@ -670,6 +683,7 @@
       .dist-controls-grid,
       .dist-actions,
       .wm-grid { grid-template-columns: 1fr; }
+      .wm-compare { grid-template-columns: 1fr; }
       #tailChart { height: 360px; }
     }
   </style>
@@ -713,7 +727,7 @@
       <button class="tab-btn active" data-tab="tab3">Distribution Explorer</button>
       <button class="tab-btn" data-tab="tab1">Side-by-Side Decode</button>
       <button class="tab-btn" data-tab="tab2">Human Preference Arena</button>
-      <button class="tab-btn" data-tab="tab4">KGW Watermark</button>
+      <button class="tab-btn" data-tab="tab4">KGW Watermark (Bonus)</button>
     </nav>
 
     <section id="tab1" class="panel">
@@ -1048,7 +1062,7 @@
             <input id="wmKey" type="text" value="15485863" />
           </div>
 
-          <button id="wmGenerate" class="primary">Generate Watermarked Text</button>
+          <button id="wmGenerate" class="primary">Generate Watermarked Text (Streaming)</button>
           <div id="wmStatus" class="status"></div>
         </div>
 
@@ -1057,7 +1071,16 @@
             <span><span class="wm-token green">green</span> in greenlist</span>
             <span><span class="wm-token red">red</span> out of greenlist</span>
           </div>
-          <div id="wmOutput" class="mono wm-output"></div>
+          <div class="wm-compare">
+            <div class="wm-col">
+              <h4>KGW Watermarked</h4>
+              <div id="wmOutput" class="mono wm-output"></div>
+            </div>
+            <div class="wm-col">
+              <h4>No Watermark Baseline</h4>
+              <div id="wmOutputPlain" class="mono wm-output"></div>
+            </div>
+          </div>
           <div id="wmMetrics" class="metrics"></div>
         </div>
       </div>
@@ -1731,11 +1754,14 @@
     async function generateWatermarked() {
       const statusEl = $('wmStatus');
       const outEl = $('wmOutput');
+      const outPlainEl = $('wmOutputPlain');
       const metricsEl = $('wmMetrics');
       $('wmGenerate').disabled = true;
       statusEl.textContent = 'Generating with KGW watermark...';
       outEl.textContent = 'Generating...';
+      outPlainEl.textContent = 'Generating...';
       outEl.classList.add('generating');
+      outPlainEl.classList.add('generating');
       metricsEl.innerHTML = '';
       try {
         const body = {
@@ -1750,32 +1776,73 @@
           delta: Number($('wmDelta').value),
           seeding_key: Number(($('wmKey').value || '15485863').trim()) || 15485863,
         };
-        const res = await fetch('/api/local/watermark/completions', {
+        const res = await fetch('/api/local/watermark/completions_stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
-        const data = await res.json();
-        const tokens = Array.isArray(data?.tokens) ? data.tokens : [];
-        outEl.innerHTML = tokens
-          .map((t) => `<span class="wm-token ${t.green ? 'green' : 'red'}">${escapeHtml(t.text)}</span>`)
-          .join('');
-        const greenCount = tokens.filter((t) => t.green).length;
-        const greenRate = tokens.length ? (100 * greenCount / tokens.length) : 0;
-        const metrics = [
-          `Green tokens ${greenCount}/${tokens.length}`,
-          `Green rate ${greenRate.toFixed(1)}%`,
-        ];
-        if (data?.performance?.tokens_per_second != null) metrics.push(`Tok/s ${Number(data.performance.tokens_per_second).toFixed(1)}`);
-        if (data?.usage?.completion_tokens != null) metrics.push(`Generated ${data.usage.completion_tokens}`);
-        metricsEl.innerHTML = metrics.map((m) => `<span class="metric">${m}</span>`).join('');
-        statusEl.textContent = 'Watermarked generation complete.';
+        if (!res.body) throw new Error('Streaming response body unavailable.');
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let wmHtml = '';
+        let plainHtml = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+          while (true) {
+            const splitAt = buffer.indexOf('\n\n');
+            if (splitAt === -1) break;
+            const packet = buffer.slice(0, splitAt);
+            buffer = buffer.slice(splitAt + 2);
+            for (const line of packet.split('\n')) {
+              if (!line.startsWith('data: ')) continue;
+              const payload = JSON.parse(line.slice(6));
+              if (payload.type === 'status') {
+                statusEl.textContent = payload.message || statusEl.textContent;
+              } else if (payload.type === 'delta_wm') {
+                const cls = payload.green ? 'green' : 'red';
+                wmHtml += `<span class="wm-token ${cls}">${escapeHtml(payload.text || '')}</span>`;
+                outEl.innerHTML = wmHtml;
+              } else if (payload.type === 'delta_plain') {
+                const cls = payload.green ? 'green' : 'red';
+                plainHtml += `<span class="wm-token ${cls}">${escapeHtml(payload.text || '')}</span>`;
+                outPlainEl.innerHTML = plainHtml;
+              } else if (payload.type === 'done') {
+                const wm = payload.wm || {};
+                const plain = payload.plain || {};
+                const metrics = [];
+                if (wm.tokens != null && wm.green_tokens != null) {
+                  const rate = wm.tokens ? (100 * wm.green_tokens / wm.tokens) : 0;
+                  metrics.push(`WM green ${wm.green_tokens}/${wm.tokens} (${rate.toFixed(1)}%)`);
+                }
+                if (plain.tokens != null && plain.green_tokens != null) {
+                  const rate = plain.tokens ? (100 * plain.green_tokens / plain.tokens) : 0;
+                  metrics.push(`Plain green ${plain.green_tokens}/${plain.tokens} (${rate.toFixed(1)}%)`);
+                }
+                if (wm.tokens_per_second != null) metrics.push(`WM Tok/s ${Number(wm.tokens_per_second).toFixed(1)}`);
+                if (plain.tokens_per_second != null) metrics.push(`Plain Tok/s ${Number(plain.tokens_per_second).toFixed(1)}`);
+                metricsEl.innerHTML = metrics.map((m) => `<span class="metric">${m}</span>`).join('');
+                statusEl.textContent = 'Watermarked generation complete.';
+                try { await reader.cancel(); } catch (_) {}
+                break;
+              } else if (payload.type === 'error') {
+                throw new Error(payload.error || 'Watermark streaming failed.');
+              }
+            }
+          }
+        }
       } catch (err) {
         statusEl.textContent = `Failed: ${err.message}`;
         outEl.textContent = '';
+        outPlainEl.textContent = '';
       } finally {
         outEl.classList.remove('generating');
+        outPlainEl.classList.remove('generating');
         $('wmGenerate').disabled = false;
       }
     }

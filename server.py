@@ -469,6 +469,114 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             "tokens_per_second": float(completion_tokens / elapsed_s) if completion_tokens > 0 else 0.0,
         }
 
+    def _stream_kgw_and_plain(
+        self,
+        runtime,
+        prompt,
+        max_tokens,
+        strategy,
+        temperature,
+        top_p,
+        top_k,
+        gamma,
+        delta,
+        seeding_key,
+    ):
+        tokenizer = runtime["tokenizer"]
+        model = runtime["model"]
+        device = runtime["device"]
+
+        inputs = tokenizer(prompt, return_tensors="pt")
+        wm_ids = inputs["input_ids"].to(device)
+        plain_ids = inputs["input_ids"].to(device)
+        wm_mask = inputs.get("attention_mask")
+        plain_mask = inputs.get("attention_mask")
+        if wm_mask is not None:
+            wm_mask = wm_mask.to(device)
+            plain_mask = plain_mask.to(device)
+        else:
+            wm_mask = torch.ones_like(wm_ids, device=device)
+            plain_mask = torch.ones_like(plain_ids, device=device)
+
+        max_tokens = max(1, min(int(max_tokens), 200))
+        gamma = min(max(float(gamma), 0.01), 0.99)
+        delta = float(delta)
+        eos_id = tokenizer.eos_token_id
+        wm_done = False
+        plain_done = False
+        wm_green = 0
+        plain_green = 0
+        wm_count = 0
+        plain_count = 0
+        started = time.perf_counter()
+
+        with torch.inference_mode():
+            for _ in range(max_tokens):
+                if wm_done and plain_done:
+                    break
+
+                if not wm_done:
+                    wm_logits = model(input_ids=wm_ids, attention_mask=wm_mask).logits[0, -1, :]
+                    prev_tok = int(wm_ids[0, -1].item())
+                    seed = self._kgw_seed(prev_tok, seeding_key)
+                    green_mask = self._kgw_green_mask(runtime, int(wm_logits.shape[0]), seed, gamma, device)
+                    adjusted = wm_logits + green_mask.to(wm_logits.dtype) * delta
+                    wm_next = self._sample_from_logits(
+                        logits=adjusted,
+                        strategy=strategy,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                    )
+                    wm_is_green = bool(green_mask[wm_next].item())
+                    wm_green += int(wm_is_green)
+                    wm_count += 1
+                    wm_text = tokenizer.decode([wm_next], clean_up_tokenization_spaces=False)
+                    yield {"type": "delta_wm", "text": wm_text, "green": wm_is_green}
+                    next_tok = torch.tensor([[wm_next]], dtype=wm_ids.dtype, device=device)
+                    wm_ids = torch.cat([wm_ids, next_tok], dim=1)
+                    wm_mask = torch.cat([wm_mask, torch.ones((1, 1), dtype=wm_mask.dtype, device=device)], dim=1)
+                    if eos_id is not None and wm_next == int(eos_id):
+                        wm_done = True
+
+                if not plain_done:
+                    plain_logits = model(input_ids=plain_ids, attention_mask=plain_mask).logits[0, -1, :]
+                    prev_tok = int(plain_ids[0, -1].item())
+                    seed = self._kgw_seed(prev_tok, seeding_key)
+                    green_mask = self._kgw_green_mask(runtime, int(plain_logits.shape[0]), seed, gamma, device)
+                    plain_next = self._sample_from_logits(
+                        logits=plain_logits,
+                        strategy=strategy,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                    )
+                    plain_is_green = bool(green_mask[plain_next].item())
+                    plain_green += int(plain_is_green)
+                    plain_count += 1
+                    plain_text = tokenizer.decode([plain_next], clean_up_tokenization_spaces=False)
+                    yield {"type": "delta_plain", "text": plain_text, "green": plain_is_green}
+                    next_tok = torch.tensor([[plain_next]], dtype=plain_ids.dtype, device=device)
+                    plain_ids = torch.cat([plain_ids, next_tok], dim=1)
+                    plain_mask = torch.cat([plain_mask, torch.ones((1, 1), dtype=plain_mask.dtype, device=device)], dim=1)
+                    if eos_id is not None and plain_next == int(eos_id):
+                        plain_done = True
+
+        elapsed_s = max(time.perf_counter() - started, 1e-6)
+        yield {
+            "type": "done",
+            "wm": {
+                "tokens": wm_count,
+                "green_tokens": wm_green,
+                "tokens_per_second": float(wm_count / elapsed_s) if wm_count > 0 else 0.0,
+            },
+            "plain": {
+                "tokens": plain_count,
+                "green_tokens": plain_green,
+                "tokens_per_second": float(plain_count / elapsed_s) if plain_count > 0 else 0.0,
+            },
+        }
+
     def do_OPTIONS(self):
         if self.path.startswith("/api/"):
             self.send_response(204)
@@ -623,6 +731,38 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                 )
             except Exception as exc:
                 self._send_json(500, {"error": str(exc)})
+            return
+
+        if self.path == "/api/local/watermark/completions_stream":
+            model_id = _normalize_model_id(body.get("model"))
+            prompt = body.get("prompt")
+            if not prompt:
+                self._send_json(400, {"error": "prompt is required"})
+                return
+            self._start_sse()
+            self._send_sse({"type": "status", "message": "loading_runtime"})
+            try:
+                runtime = _load_runtime(model_id)
+                self._send_sse({"type": "status", "message": "runtime_ready", "device": runtime["device"]})
+                for event in self._stream_kgw_and_plain(
+                    runtime=runtime,
+                    prompt=prompt,
+                    max_tokens=body.get("max_tokens", 80),
+                    strategy=body.get("strategy", "topp"),
+                    temperature=body.get("temperature", 1.0),
+                    top_p=body.get("top_p", 0.92),
+                    top_k=body.get("top_k", 40),
+                    gamma=body.get("gamma", 0.25),
+                    delta=body.get("delta", 2.0),
+                    seeding_key=body.get("seeding_key", 15485863),
+                ):
+                    self._send_sse(event)
+                self.close_connection = True
+            except Exception as exc:
+                try:
+                    self._send_sse({"type": "error", "error": str(exc)})
+                except Exception:
+                    pass
             return
 
         if self.path == "/api/local/watermark/completions":
