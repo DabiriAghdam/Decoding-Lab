@@ -174,8 +174,8 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             if normalized["temperature"] <= 0.0:
                 raise ValueError("temperature must be > 0 for top-p strategy")
             normalized["top_p"] = float(top_p)
-            if not (0.0 < normalized["top_p"] <= 1.0):
-                raise ValueError("top_p must be in (0, 1] for top-p strategy")
+            if not (0.1 <= normalized["top_p"] <= 1.0):
+                raise ValueError("top_p must be in [0.1, 1] for top-p strategy")
             normalized["top_k"] = 0
             normalized["beam_size"] = 1
         else:  # sample
@@ -416,7 +416,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         top_n = min(top_n, vocab_size)
         top_k = max(1, min(int(top_k or 20), vocab_size))
         top_p = float(top_p if top_p is not None else 0.9)
-        top_p = min(max(top_p, 0.01), 1.0)
+        top_p = min(max(top_p, 0.1), 1.0)
 
         cumulative = torch.cumsum(sorted_probs, dim=-1)
         top_p_rank = int(torch.searchsorted(cumulative, torch.tensor(top_p), right=False).item() + 1)
@@ -475,7 +475,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
 
         if top_p is None:
             raise ValueError("top_p is required for top-p strategy")
-        p = min(max(float(top_p), 0.01), 1.0)
+        p = min(max(float(top_p), 0.1), 1.0)
         sorted_probs, sorted_idx = torch.sort(probs, descending=True)
         cumulative = torch.cumsum(sorted_probs, dim=-1)
         remove_mask = cumulative > p
