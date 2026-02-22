@@ -1297,10 +1297,7 @@
         body.top_p = cfg.top_p;
         return body;
       }
-      body.temperature = cfg.temperature;
-      body.top_p = cfg.top_p;
-      body.top_k = cfg.top_k;
-      return body;
+      throw new Error(`Unsupported strategy: ${cfg.strategy}`);
     }
 
     async function localChat(cfg) {
@@ -2211,6 +2208,8 @@
         } else if (strategy === 'topp') {
           body.temperature = temperature;
           body.top_p = topP;
+        } else if (strategy !== 'chart_click') {
+          throw new Error(`Unsupported strategy: ${strategy}`);
         }
         let token = '';
         if (strategy === 'chart_click') {

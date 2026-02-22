@@ -33,6 +33,8 @@ else:
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8000"))
 DIST_CACHE_MAX_ENTRIES = int(os.environ.get("DIST_CACHE_MAX_ENTRIES", "128"))
+ALLOWED_DECODE_STRATEGIES = {"greedy", "beam", "topk", "topp", "sample"}
+ALLOWED_SAMPLING_STRATEGIES = {"greedy", "topk", "topp", "sample"}
 
 
 MODEL_CACHE = {}
@@ -110,18 +112,32 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
         self.wfile.flush()
 
-    def _parse_decode_request(self, body, default_max_tokens=120, default_temperature=0.9):
+    def _parse_decode_request(
+        self,
+        body,
+        default_max_tokens=120,
+        default_temperature=0.9,
+        allowed_strategies=None,
+    ):
+        allowed = allowed_strategies or ALLOWED_DECODE_STRATEGIES
+        strategy = body.get("strategy")
+        strategy = strategy.strip().lower() if isinstance(strategy, str) else ""
+        if strategy not in allowed:
+            supported = ", ".join(sorted(allowed))
+            raise ValueError(f"strategy is required and must be one of: {supported}")
         return {
             "max_tokens": body.get("max_tokens", default_max_tokens),
             "temperature": body.get("temperature", default_temperature),
             "top_p": body.get("top_p", 1.0),
             "top_k": body.get("top_k"),
             "beam_size": body.get("beam_size", 1),
-            "strategy": body.get("strategy"),
+            "strategy": strategy,
         }
 
     def _normalize_decoding_params(self, strategy, temperature, top_p, top_k, beam_size):
         strategy = (strategy or "").strip().lower()
+        if strategy not in ALLOWED_DECODE_STRATEGIES:
+            raise ValueError("Unsupported strategy")
         normalized = {
             "strategy": strategy,
             "temperature": float(temperature if temperature is not None else 1.0),
@@ -129,19 +145,6 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             "top_k": int(top_k) if top_k is not None else 0,
             "beam_size": max(1, int(beam_size or 1)),
         }
-
-        if normalized["strategy"] not in {"greedy", "beam", "topk", "topp", "sample"}:
-            # Fallback inference for older payloads that do not send explicit strategy.
-            if normalized["beam_size"] > 1:
-                normalized["strategy"] = "beam"
-            elif normalized["temperature"] <= 0.0001:
-                normalized["strategy"] = "greedy"
-            elif normalized["top_p"] < 0.999999 and normalized["top_p"] > 0:
-                normalized["strategy"] = "topp"
-            elif normalized["top_k"] > 0:
-                normalized["strategy"] = "topk"
-            else:
-                normalized["strategy"] = "sample"
 
         if normalized["strategy"] == "greedy":
             normalized["temperature"] = 0.0
@@ -394,7 +397,9 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         }
 
     def _sample_from_logits(self, logits, strategy, temperature, top_p, top_k):
-        strategy = (strategy or "topp").strip().lower()
+        strategy = (strategy or "").strip().lower()
+        if strategy not in ALLOWED_SAMPLING_STRATEGIES:
+            raise ValueError("Unsupported strategy")
         if strategy == "greedy":
             return int(torch.argmax(logits).item())
 
@@ -790,16 +795,22 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             self._start_sse()
             self._send_sse({"type": "status", "message": "loading_runtime"})
             try:
+                params = self._parse_decode_request(
+                    body,
+                    default_max_tokens=80,
+                    default_temperature=1.0,
+                    allowed_strategies=ALLOWED_SAMPLING_STRATEGIES,
+                )
                 runtime = _load_runtime(model_id)
                 self._send_sse({"type": "status", "message": "runtime_ready", "device": runtime["device"]})
                 for event in self._stream_kgw_and_plain(
                     runtime=runtime,
                     prompt=prompt,
-                    max_tokens=body.get("max_tokens", 80),
-                    strategy=body.get("strategy", "topp"),
-                    temperature=body.get("temperature", 1.0),
-                    top_p=body.get("top_p", 0.92),
-                    top_k=body.get("top_k", 40),
+                    max_tokens=params["max_tokens"],
+                    strategy=params["strategy"],
+                    temperature=params["temperature"],
+                    top_p=params["top_p"],
+                    top_k=params["top_k"],
                     gamma=body.get("gamma", 0.25),
                     delta=body.get("delta", 2.0),
                     seeding_key=body.get("seeding_key", 15485863),
@@ -820,15 +831,21 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"error": "prompt is required"})
                 return
             try:
+                params = self._parse_decode_request(
+                    body,
+                    default_max_tokens=80,
+                    default_temperature=1.0,
+                    allowed_strategies=ALLOWED_SAMPLING_STRATEGIES,
+                )
                 runtime = _load_runtime(model_id)
                 gen = self._generate_kgw_watermarked(
                     runtime=runtime,
                     prompt=prompt,
-                    max_tokens=body.get("max_tokens", 80),
-                    strategy=body.get("strategy", "topp"),
-                    temperature=body.get("temperature", 1.0),
-                    top_p=body.get("top_p", 0.92),
-                    top_k=body.get("top_k", 40),
+                    max_tokens=params["max_tokens"],
+                    strategy=params["strategy"],
+                    temperature=params["temperature"],
+                    top_p=params["top_p"],
+                    top_k=params["top_k"],
                     gamma=body.get("gamma", 0.25),
                     delta=body.get("delta", 2.0),
                     seeding_key=body.get("seeding_key", 15485863),
