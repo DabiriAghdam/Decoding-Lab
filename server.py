@@ -489,81 +489,79 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         model = runtime["model"]
         device = runtime["device"]
 
-        inputs = tokenizer(prompt, return_tensors="pt")
-        wm_ids = inputs["input_ids"].to(device)
-        plain_ids = inputs["input_ids"].to(device)
-        wm_mask = inputs.get("attention_mask")
-        plain_mask = inputs.get("attention_mask")
-        if wm_mask is not None:
-            wm_mask = wm_mask.to(device)
-            plain_mask = plain_mask.to(device)
-        else:
-            wm_mask = torch.ones_like(wm_ids, device=device)
-            plain_mask = torch.ones_like(plain_ids, device=device)
-
         max_tokens = max(1, min(int(max_tokens), 200))
         gamma = min(max(float(gamma), 0.01), 0.99)
         delta = float(delta)
         eos_id = tokenizer.eos_token_id
-        wm_done = False
-        plain_done = False
-        wm_green = 0
-        plain_green = 0
-        wm_count = 0
-        plain_count = 0
+        inputs = tokenizer(prompt, return_tensors="pt")
+        base_ids = inputs["input_ids"].to(device)
+        base_mask = inputs.get("attention_mask")
+        if base_mask is not None:
+            base_mask = base_mask.to(device)
+        else:
+            base_mask = torch.ones_like(base_ids, device=device)
+
+        def run_one_stream(apply_watermark):
+            input_ids = base_ids
+            attention_mask = base_mask
+            prev_tok = int(base_ids[0, -1].item())
+            past_key_values = None
+            gen_count = 0
+            gen_green = 0
+
+            with torch.inference_mode():
+                for _ in range(max_tokens):
+                    out = model(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        use_cache=True,
+                        past_key_values=past_key_values,
+                    )
+                    logits = out.logits[0, -1, :]
+                    past_key_values = out.past_key_values
+
+                    seed = self._kgw_seed(prev_tok, seeding_key)
+                    green_mask = self._kgw_green_mask(runtime, int(logits.shape[0]), seed, gamma, device)
+                    decode_logits = logits + green_mask.to(logits.dtype) * delta if apply_watermark else logits
+                    next_tok = self._sample_from_logits(
+                        logits=decode_logits,
+                        strategy=strategy,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k,
+                    )
+                    is_green = bool(green_mask[next_tok].item())
+                    gen_green += int(is_green)
+                    gen_count += 1
+                    tok_text = tokenizer.decode([next_tok], clean_up_tokenization_spaces=False)
+                    yield next_tok, tok_text, is_green, gen_count, gen_green
+
+                    prev_tok = int(next_tok)
+                    input_ids = torch.tensor([[next_tok]], dtype=base_ids.dtype, device=device)
+                    attention_mask = torch.cat(
+                        [attention_mask, torch.ones((1, 1), dtype=attention_mask.dtype, device=device)],
+                        dim=1,
+                    )
+                    if eos_id is not None and next_tok == int(eos_id):
+                        break
+
         started = time.perf_counter()
+        wm_count = 0
+        wm_green = 0
+        plain_count = 0
+        plain_green = 0
 
-        with torch.inference_mode():
-            for _ in range(max_tokens):
-                if wm_done and plain_done:
-                    break
+        yield {"type": "status", "message": "streaming_watermarked"}
+        for _, tok_text, is_green, gen_count, gen_green in run_one_stream(True):
+            wm_count = gen_count
+            wm_green = gen_green
+            yield {"type": "delta_wm", "text": tok_text, "green": is_green}
 
-                if not wm_done:
-                    wm_logits = model(input_ids=wm_ids, attention_mask=wm_mask).logits[0, -1, :]
-                    prev_tok = int(wm_ids[0, -1].item())
-                    seed = self._kgw_seed(prev_tok, seeding_key)
-                    green_mask = self._kgw_green_mask(runtime, int(wm_logits.shape[0]), seed, gamma, device)
-                    adjusted = wm_logits + green_mask.to(wm_logits.dtype) * delta
-                    wm_next = self._sample_from_logits(
-                        logits=adjusted,
-                        strategy=strategy,
-                        temperature=temperature,
-                        top_p=top_p,
-                        top_k=top_k,
-                    )
-                    wm_is_green = bool(green_mask[wm_next].item())
-                    wm_green += int(wm_is_green)
-                    wm_count += 1
-                    wm_text = tokenizer.decode([wm_next], clean_up_tokenization_spaces=False)
-                    yield {"type": "delta_wm", "text": wm_text, "green": wm_is_green}
-                    next_tok = torch.tensor([[wm_next]], dtype=wm_ids.dtype, device=device)
-                    wm_ids = torch.cat([wm_ids, next_tok], dim=1)
-                    wm_mask = torch.cat([wm_mask, torch.ones((1, 1), dtype=wm_mask.dtype, device=device)], dim=1)
-                    if eos_id is not None and wm_next == int(eos_id):
-                        wm_done = True
-
-                if not plain_done:
-                    plain_logits = model(input_ids=plain_ids, attention_mask=plain_mask).logits[0, -1, :]
-                    prev_tok = int(plain_ids[0, -1].item())
-                    seed = self._kgw_seed(prev_tok, seeding_key)
-                    green_mask = self._kgw_green_mask(runtime, int(plain_logits.shape[0]), seed, gamma, device)
-                    plain_next = self._sample_from_logits(
-                        logits=plain_logits,
-                        strategy=strategy,
-                        temperature=temperature,
-                        top_p=top_p,
-                        top_k=top_k,
-                    )
-                    plain_is_green = bool(green_mask[plain_next].item())
-                    plain_green += int(plain_is_green)
-                    plain_count += 1
-                    plain_text = tokenizer.decode([plain_next], clean_up_tokenization_spaces=False)
-                    yield {"type": "delta_plain", "text": plain_text, "green": plain_is_green}
-                    next_tok = torch.tensor([[plain_next]], dtype=plain_ids.dtype, device=device)
-                    plain_ids = torch.cat([plain_ids, next_tok], dim=1)
-                    plain_mask = torch.cat([plain_mask, torch.ones((1, 1), dtype=plain_mask.dtype, device=device)], dim=1)
-                    if eos_id is not None and plain_next == int(eos_id):
-                        plain_done = True
+        yield {"type": "status", "message": "streaming_plain"}
+        for _, tok_text, is_green, gen_count, gen_green in run_one_stream(False):
+            plain_count = gen_count
+            plain_green = gen_green
+            yield {"type": "delta_plain", "text": tok_text, "green": is_green}
 
         elapsed_s = max(time.perf_counter() - started, 1e-6)
         yield {
