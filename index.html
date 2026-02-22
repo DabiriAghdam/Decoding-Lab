@@ -697,24 +697,20 @@
       <div class="field theme-topright">
         <label for="themeSelect">Theme</label>
         <select id="themeSelect">
-          <option value="forest" selected>Forest Light</option>
-          <option value="ocean">Ocean Light</option>
-          <option value="night">Night Mode</option>
+          <option value="forest" selected>Forest</option>
+          <option value="ocean">Ocean</option>
+          <option value="night">Night</option>
         </select>
       </div>
       <div class="hero-row">
         <div class="field model-compact">
           <label for="model">Model</label>
           <select id="model">
-            <option value="gpt2">gpt2 (small)</option>
-            <option value="gpt2-medium">gpt2-medium</option>
             <option value="gpt2-large" selected>gpt2-large</option>
             <option value="gpt2-xl">gpt2-xl</option>
-            <option value="distilgpt2">distilgpt2</option>
+            <option value="gpt2-medium">gpt2-medium</option>
             <option value="Qwen/Qwen3-0.6B">Qwen3-0.6B</option>
-            <option value="EleutherAI/pythia-410m-deduped">EleutherAI/pythia-410m-deduped</option>
             <option value="Qwen/Qwen2.5-0.5B">Qwen/Qwen2.5-0.5B</option>
-            <option value="TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T">TinyLlama-1.1B</option>
           </select>
         </div>
         <button id="preloadModel">Load Model</button>
@@ -1033,9 +1029,9 @@
           <div class="field">
             <label for="wmStrategy">Decoding Strategy</label>
             <select id="wmStrategy">
-              <option value="topp" selected>Top-p (Nucleus)</option>
+              <option value="topp">Top-p (Nucleus)</option>
               <option value="topk">Top-k</option>
-              <option value="greedy">Greedy</option>
+              <option value="greedy" selected>Greedy</option>
               <option value="sample">Pure Sampling</option>
             </select>
           </div>
