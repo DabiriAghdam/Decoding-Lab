@@ -941,7 +941,6 @@
             <div class="field">
               <label for="arenaPair">Method Pair</label>
               <select id="arenaPair">
-                <option value="random_blind">Random Pair (Blind)</option>
                 <option value="topp_vs_greedy">Top-p vs Greedy</option>
                 <option value="sample_vs_greedy">Pure Sampling vs Greedy</option>
                 <option value="sample_vs_topp">Pure Sampling vs Top-p</option>
@@ -1654,7 +1653,6 @@
     let arenaRound = 0;
     let roundPicked = false;
     let arenaFinished = false;
-    let randomArenaPairKey = null;
     let leftMethod = 'Top-p (Nucleus)';
     let rightMethod = 'Greedy';
     const methodWins = {
@@ -1716,22 +1714,6 @@
         top_p: 1,
         max_tokens: arenaMaxTokens,
       };
-      const pool = [
-        { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy' },
-        { left: sample, right: greedy, leftName: 'Pure Sampling', rightName: 'Greedy' },
-        { left: sample, right: topp, leftName: 'Pure Sampling', rightName: 'Top-p (Nucleus)' },
-        { left: beam, right: greedy, leftName: 'Beam Search', rightName: 'Greedy' },
-        { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy' },
-        { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' },
-        { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)' },
-      ];
-      if (pair === 'random_blind') {
-        if (randomArenaPairKey == null) {
-          randomArenaPairKey = Math.floor(Math.random() * pool.length);
-        }
-        const picked = pool[randomArenaPairKey];
-        return { ...picked, randomPair: true };
-      }
       if (pair === 'topk_vs_greedy') {
         return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy' };
       }
@@ -1750,7 +1732,6 @@
       if (pair === 'topp_vs_topk') {
         return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' };
       }
-      randomArenaPairKey = null;
       return { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy' };
     }
 
@@ -1766,9 +1747,7 @@
       $('roundNum').textContent = String(arenaRound + 1);
       $('roundResult').textContent = '';
       $('revealBox').textContent = '';
-      $('arenaStatus').textContent = pair.randomPair
-        ? 'Generating round with a hidden random method pair...'
-        : 'Generating round...';
+      $('arenaStatus').textContent = 'Generating round...';
       $('leftMeta').textContent = '';
       $('rightMeta').textContent = '';
       $('leftText').textContent = 'Generating...';
@@ -1832,7 +1811,6 @@
       score = 0;
       roundPicked = false;
       arenaFinished = false;
-      randomArenaPairKey = null;
       Object.keys(methodWins).forEach((k) => { methodWins[k] = 0; });
       $('scoreNum').textContent = '0';
       $('roundNum').textContent = '1';
