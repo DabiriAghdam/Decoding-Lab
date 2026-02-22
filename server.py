@@ -32,6 +32,7 @@ else:
 
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8000"))
+DIST_CACHE_MAX_ENTRIES = int(os.environ.get("DIST_CACHE_MAX_ENTRIES", "128"))
 
 
 MODEL_CACHE = {}
@@ -70,6 +71,9 @@ def _load_runtime(model_id):
         "tokenizer": tokenizer,
         "model": model,
         "loaded_in_s": round(time.time() - started, 2),
+        "dist_cache": {},
+        "dist_cache_order": [],
+        "dist_cache_lock": threading.Lock(),
     }
     with CACHE_LOCK:
         MODEL_CACHE[model_id] = runtime
@@ -149,7 +153,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
             gen_kwargs.update({"do_sample": False})
 
         started = time.perf_counter()
-        with torch.no_grad():
+        with torch.inference_mode():
             output = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -225,7 +229,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
 
         def _worker():
             try:
-                with torch.no_grad():
+                with torch.inference_mode():
                     model.generate(**gen_kwargs)
             except Exception as exc:
                 worker_error["error"] = str(exc)
@@ -264,18 +268,46 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
         device = runtime["device"]
+        prompt_key = prompt
 
         top_n = max(5, min(int(top_n), 320))
-        inputs = tokenizer(prompt, return_tensors="pt")
-        input_ids = inputs["input_ids"].to(device)
-        attention_mask = inputs.get("attention_mask")
-        if attention_mask is not None:
-            attention_mask = attention_mask.to(device)
+        with runtime["dist_cache_lock"]:
+            cached = runtime["dist_cache"].get(prompt_key)
+            if cached is not None:
+                sorted_probs = cached["sorted_probs"]
+                sorted_indices = cached["sorted_indices"]
+            else:
+                sorted_probs = None
+                sorted_indices = None
 
-        with torch.no_grad():
-            logits = model(input_ids=input_ids, attention_mask=attention_mask).logits[0, -1, :]
-            probs = torch.softmax(logits, dim=-1)
-            sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+        if sorted_probs is None or sorted_indices is None:
+            inputs = tokenizer(prompt, return_tensors="pt")
+            input_ids = inputs["input_ids"].to(device)
+            attention_mask = inputs.get("attention_mask")
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(device)
+
+            with torch.inference_mode():
+                logits = model(input_ids=input_ids, attention_mask=attention_mask).logits[0, -1, :]
+                probs = torch.softmax(logits, dim=-1)
+                sorted_probs_dev, sorted_indices_dev = torch.sort(probs, descending=True)
+                sorted_probs = sorted_probs_dev.detach().to("cpu")
+                sorted_indices = sorted_indices_dev.detach().to("cpu")
+
+            with runtime["dist_cache_lock"]:
+                if prompt_key in runtime["dist_cache"]:
+                    try:
+                        runtime["dist_cache_order"].remove(prompt_key)
+                    except ValueError:
+                        pass
+                runtime["dist_cache"][prompt_key] = {
+                    "sorted_probs": sorted_probs,
+                    "sorted_indices": sorted_indices,
+                }
+                runtime["dist_cache_order"].append(prompt_key)
+                while len(runtime["dist_cache_order"]) > DIST_CACHE_MAX_ENTRIES:
+                    old_key = runtime["dist_cache_order"].pop(0)
+                    runtime["dist_cache"].pop(old_key, None)
 
         vocab_size = int(sorted_probs.shape[0])
         top_n = min(top_n, vocab_size)
@@ -284,7 +316,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
         top_p = min(max(top_p, 0.01), 1.0)
 
         cumulative = torch.cumsum(sorted_probs, dim=-1)
-        top_p_rank = int(torch.searchsorted(cumulative, torch.tensor(top_p, device=device), right=False).item() + 1)
+        top_p_rank = int(torch.searchsorted(cumulative, torch.tensor(top_p), right=False).item() + 1)
         top_p_rank = max(1, min(top_p_rank, vocab_size))
 
         tokens = []
