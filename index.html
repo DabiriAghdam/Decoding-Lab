@@ -1654,7 +1654,7 @@
     let arenaRound = 0;
     let roundPicked = false;
     let arenaFinished = false;
-    const randomRoundCache = {};
+    let randomArenaPairKey = null;
     let leftMethod = 'Top-p (Nucleus)';
     let rightMethod = 'Greedy';
     const methodWins = {
@@ -1726,7 +1726,10 @@
         { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)' },
       ];
       if (pair === 'random_blind') {
-        const picked = pool[Math.floor(Math.random() * pool.length)];
+        if (randomArenaPairKey == null) {
+          randomArenaPairKey = Math.floor(Math.random() * pool.length);
+        }
+        const picked = pool[randomArenaPairKey];
         return { ...picked, randomPair: true };
       }
       if (pair === 'topk_vs_greedy') {
@@ -1747,25 +1750,15 @@
       if (pair === 'topp_vs_topk') {
         return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' };
       }
+      randomArenaPairKey = null;
       return { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy' };
     }
 
     async function loadRound() {
       if (arenaFinished) return;
       const prompt = arenaPrompts[round];
-      const mode = $('arenaPair').value;
-      let pair = arenaPairConfigs(prompt);
+      const pair = arenaPairConfigs(prompt);
       let leftIsPrimary = Math.random() > 0.5;
-
-      if (mode === 'random_blind') {
-        const cached = randomRoundCache[arenaRound];
-        if (cached) {
-          pair = cached.pair;
-          leftIsPrimary = cached.leftIsPrimary;
-        } else {
-          randomRoundCache[arenaRound] = { pair, leftIsPrimary };
-        }
-      }
 
       roundPicked = false;
       $('pickLeft').disabled = false;
@@ -1853,7 +1846,7 @@
       score = 0;
       roundPicked = false;
       arenaFinished = false;
-      Object.keys(randomRoundCache).forEach((k) => { delete randomRoundCache[k]; });
+      randomArenaPairKey = null;
       Object.keys(methodWins).forEach((k) => { methodWins[k] = 0; });
       $('scoreNum').textContent = '0';
       $('roundNum').textContent = '1';
