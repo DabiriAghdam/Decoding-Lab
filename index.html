@@ -829,7 +829,7 @@
 
             <div id="aBeamWrap" class="field">
               <label for="aBeam">Beam Size (b): <span id="aBeamVal">4</span></label>
-              <input id="aBeam" type="range" min="1" max="8" step="1" value="4" />
+              <input id="aBeam" type="range" min="1" max="16" step="1" value="4" />
             </div>
 
           </div>
@@ -879,7 +879,7 @@
 
             <div id="bBeamWrap" class="field">
               <label for="bBeam">Beam Size (b): <span id="bBeamVal">4</span></label>
-              <input id="bBeam" type="range" min="1" max="8" step="1" value="4" />
+              <input id="bBeam" type="range" min="1" max="16" step="1" value="4" />
             </div>
 
           </div>
@@ -1006,17 +1006,22 @@
               <input id="pCut" type="range" min="0.10" max="1.00" step="0.01" value="0.90" />
             </div>
 
-          <div class="field">
-            <label for="nextTokenStrategy">Next Token Strategy</label>
-            <select id="nextTokenStrategy">
-              <option value="greedy">Greedy</option>
-              <option value="beam">Beam Search</option>
-              <option value="topk">Top-k</option>
-              <option value="topp" selected>Top-p (Nucleus)</option>
-              <option value="sample">Pure Sampling</option>
-              <option value="chart_click">Chart Click (Selected Token)</option>
-            </select>
-          </div>
+            <div class="field">
+              <label for="nextBeam">Beam Size (b): <span id="nextBeamVal">4</span></label>
+              <input id="nextBeam" type="range" min="1" max="16" step="1" value="4" />
+            </div>
+
+            <div class="field">
+              <label for="nextTokenStrategy">Next Token Strategy</label>
+              <select id="nextTokenStrategy">
+                <option value="greedy">Greedy</option>
+                <option value="beam">Beam Search</option>
+                <option value="topk">Top-k</option>
+                <option value="topp" selected>Top-p (Nucleus)</option>
+                <option value="sample">Pure Sampling</option>
+                <option value="chart_click">Chart Click (Selected Token)</option>
+              </select>
+            </div>
           </div>
 
           <div class="dist-actions">
@@ -1177,6 +1182,7 @@
     attachRange('distN', 'distNVal');
     attachRange('kCut', 'kCutVal');
     attachRange('pCut', 'pCutVal', (v) => v.toFixed(2));
+    attachRange('nextBeam', 'nextBeamVal');
     attachRange('arenaMaxTokens', 'arenaMaxTokensVal');
     attachRange('wmMaxTokens', 'wmMaxTokensVal');
     attachRange('wmTemp', 'wmTempVal', (v) => v.toFixed(2));
@@ -1299,7 +1305,7 @@
       if (cfg.strategy === 'beam') {
         body.temperature = 0;
         body.top_p = 1;
-        body.beam_size = Math.max(2, Number(cfg.beam_size) || 4);
+        body.beam_size = Math.max(1, Number(cfg.beam_size) || 4);
         return body;
       }
       if (cfg.strategy === 'topk') {
@@ -2206,6 +2212,7 @@
         const temperature = 0.9;
         const topP = Number($('pCut').value);
         const topK = Number($('kCut').value);
+        const beamSize = Number($('nextBeam').value);
         const body = {
           model: apiConfig().model,
           prompt,
@@ -2218,7 +2225,7 @@
         } else if (strategy === 'beam') {
           body.temperature = 0;
           body.top_p = 1;
-          body.beam_size = 4;
+          body.beam_size = Math.max(1, beamSize || 4);
         } else if (strategy === 'topk') {
           body.temperature = temperature;
           body.top_p = 1;
@@ -2257,7 +2264,13 @@
           strategy === 'sample' ? 'pure-sampling' :
           strategy === 'topp' ? 'top-p' :
           strategy === 'topk' ? 'top-k' : 'greedy';
-        $('nextTokenStatus').textContent = `Added token (${strategyName}): ${safeTokenLabel(token)}`;
+        const strategyParams =
+          strategy === 'beam' ? `b=${body.beam_size}` :
+          strategy === 'topk' ? `k=${topK}, temp=${temperature.toFixed(2)}` :
+          strategy === 'topp' ? `p=${topP.toFixed(2)}, temp=${temperature.toFixed(2)}` :
+          strategy === 'sample' ? `temp=${temperature.toFixed(2)}` :
+          strategy === 'chart_click' ? 'manual chart token' : 'deterministic';
+        $('nextTokenStatus').textContent = `Added token (${strategyName}; ${strategyParams}): ${safeTokenLabel(token)}`;
         await fetchRealDistribution();
       } catch (err) {
         $('nextTokenStatus').textContent = `Failed: ${err.message}`;

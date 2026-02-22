@@ -148,7 +148,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             normalized["temperature"] = 0.0
             normalized["top_p"] = 1.0
             normalized["top_k"] = 0
-            normalized["beam_size"] = max(2, normalized["beam_size"])
+            normalized["beam_size"] = max(1, normalized["beam_size"])
         elif strategy == "topk":
             if temperature is None:
                 raise ValueError("temperature is required for top-k strategy")
