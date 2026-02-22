@@ -410,16 +410,6 @@
       gap: 8px 10px;
     }
 
-    .toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding-top: 20px;
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: var(--muted);
-    }
-
     .mono {
       border: 1px solid #d3e4d9;
       border-radius: 12px;
@@ -1110,7 +1100,6 @@
         top_k: Number($(`${prefix}Topk`).value),
         top_p: Number($(`${prefix}Topp`).value),
         beam_size: Number($(`${prefix}Beam`).value),
-        stream: true,
       };
     }
 
@@ -1319,16 +1308,9 @@
       $('generateA').disabled = true;
       $('generateB').disabled = true;
 
-      const aCfg = readSample('a');
-      const bCfg = readSample('b');
-
       try {
-        if (!aCfg.stream && !bCfg.stream) {
-          await Promise.all([runSingle('a', true), runSingle('b', true)]);
-        } else {
-          await runSingle('a', true);
-          await runSingle('b', true);
-        }
+        await runSingle('a', true);
+        await runSingle('b', true);
         genStatusEl.textContent = 'Both samples updated.';
       } catch (err) {
         genStatusEl.textContent = `Failed: ${err.message}`;
@@ -1442,7 +1424,6 @@
         top_k: 40,
         top_p: 1,
         max_tokens: arenaMaxTokens,
-        stream: true,
       };
       const topp = {
         model,
@@ -1452,7 +1433,6 @@
         top_k: 40,
         top_p: 0.92,
         max_tokens: arenaMaxTokens,
-        stream: true,
       };
       const beam = {
         model,
@@ -1463,7 +1443,6 @@
         top_p: 1,
         beam_size: 4,
         max_tokens: arenaMaxTokens,
-        stream: true,
       };
       const topk = {
         model,
@@ -1473,7 +1452,6 @@
         top_k: 40,
         top_p: 1,
         max_tokens: arenaMaxTokens,
-        stream: true,
       };
       const pool = [
         { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy' },
@@ -1487,18 +1465,18 @@
         return { ...picked, randomPair: true };
       }
       if (pair === 'topk_vs_greedy') {
-        return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy', targetName: 'Top-k' };
+        return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy' };
       }
       if (pair === 'beam_vs_greedy') {
-        return { left: beam, right: greedy, leftName: 'Beam Search', rightName: 'Greedy', targetName: 'Beam Search' };
+        return { left: beam, right: greedy, leftName: 'Beam Search', rightName: 'Greedy' };
       }
       if (pair === 'beam_vs_topp') {
-        return { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)', targetName: 'Beam Search' };
+        return { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)' };
       }
       if (pair === 'topp_vs_topk') {
-        return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k', targetName: 'Top-p (Nucleus)' };
+        return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' };
       }
-      return { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy', targetName: 'Top-p (Nucleus)' };
+      return { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy' };
     }
 
     async function loadRound() {
@@ -1693,8 +1671,6 @@
 
       const probs = distTokens.map((t) => t.prob);
       const kRaw = Number($('kCut').value);
-      const pCut = Number($('pCut').value);
-
       if (!probs.length) {
         drawChartMessage('No distribution loaded yet.');
         $('nucleusLen').textContent = '0';
