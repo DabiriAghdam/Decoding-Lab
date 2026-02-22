@@ -71,6 +71,21 @@
       gap: 12px;
     }
 
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(47, 141, 96, 0.08), transparent);
+      transform: translateX(-100%);
+      animation: heroSweep 7s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes heroSweep {
+      0%, 25% { transform: translateX(-100%); }
+      55%, 100% { transform: translateX(100%); }
+    }
+
     .hero::after {
       content: "";
       position: absolute;
@@ -407,11 +422,13 @@
     }
 
     .arena-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: grid;
       gap: 10px;
-      flex-wrap: wrap;
+    }
+
+    .arena-top {
+      display: grid;
+      gap: 8px;
     }
 
     .arena-score {
@@ -507,6 +524,21 @@
       font-size: 0.84rem;
       min-height: 1.1em;
       font-weight: 700;
+    }
+
+    .site-footer {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: linear-gradient(180deg, #ffffff, #edf8f2);
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    body[data-theme="night"] .site-footer {
+      background: #11202b;
     }
 
     @media (max-width: 1120px) {
@@ -701,11 +733,34 @@
     <section id="tab2" class="panel">
       <div class="card">
         <div class="arena-head">
-          <div style="display:grid;gap:8px;">
+          <div class="arena-top">
             <div class="chip">Blind decoding preference arena</div>
             <div class="arena-score">
               Round <span id="roundNum">1</span>/5 · Selections <span id="scoreNum">0</span>
               <span id="roundResult" style="margin-left:8px;"></span>
+            </div>
+            <div class="field">
+              <label for="arenaTemplate">Prompt Template</label>
+              <select id="arenaTemplate">
+                <option value="paper_unicorn">Paper · In a shocking finding, scientists discovered</option>
+                <option value="paper_university">Paper · The university said in a statement that</option>
+                <option value="paper_city">Paper · The city council announced that</option>
+                <option value="paper_museum">Paper · The museum curator explained that</option>
+                <option value="paper_story">Paper · Once upon a time, in a small village</option>
+                <option value="paper_essay">Paper · The meaning of life is</option>
+                <option value="paper_news">Paper · The report found that</option>
+                <option value="paper_fig5_flat">Paper Fig 5 · She said, \" I never</option>
+                <option value="paper_fig5_peaked">Paper Fig 5 · I ate the pizza while it was still</option>
+                <option value="city_billboard">Reactive city billboard story</option>
+                <option value="receipt_poetry">Receipt poetry at midnight</option>
+                <option value="satellite_last">Satellite final message</option>
+                <option value="museum_diary">Museum digitized diaries</option>
+                <option value="weather_mood">Weather report predicts moods</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="arenaPrompt">Arena Prompt</label>
+              <textarea id="arenaPrompt">In a shocking finding, scientists discovered</textarea>
             </div>
           </div>
 
@@ -806,7 +861,7 @@
 
             <div class="field">
               <label for="pCut">Top-p Overlay: <span id="pCutVal">0.90</span></label>
-              <input id="pCut" type="range" min="0.20" max="0.99" step="0.01" value="0.90" />
+              <input id="pCut" type="range" min="0.10" max="1.00" step="0.01" value="0.90" />
             </div>
 
           <div class="field">
@@ -829,6 +884,7 @@
       </div>
     </section>
   </div>
+  <footer class="site-footer">Made with heart for CPSC 532B · Decoding Dashboard Explorer</footer>
 
   <script>
     const $ = (id) => document.getElementById(id);
@@ -870,13 +926,6 @@
       if (v === 'beam') return 'Beam Search';
       if (v === 'topk') return 'Top-k';
       return 'Top-p (Nucleus)';
-    }
-
-    function strategyShort(cfg) {
-      if (cfg.strategy === 'greedy') return 'deterministic';
-      if (cfg.strategy === 'beam') return `b=${cfg.beam_size}`;
-      if (cfg.strategy === 'topk') return `k=${cfg.top_k}, T=${cfg.temperature.toFixed(2)}`;
-      return `p=${cfg.top_p.toFixed(2)}, T=${cfg.temperature.toFixed(2)}`;
     }
 
     function attachRange(rangeId, valueId, formatter) {
@@ -1076,8 +1125,7 @@
     function updateSampleTitle(prefix) {
       const cfg = readSample(prefix);
       const label = strategyLabel(cfg.strategy);
-      const detail = strategyShort(cfg);
-      $(`sample${prefix.toUpperCase()}Title`).textContent = `Sample ${prefix.toUpperCase()} · ${label} (${detail})`;
+      $(`sample${prefix.toUpperCase()}Title`).textContent = `Sample ${prefix.toUpperCase()} · ${label}`;
     }
 
     function updateMethodControls(prefix) {
@@ -1181,6 +1229,13 @@
         $('distPrompt').value = promptTemplates[key];
         $('nextTokenStatus').textContent = 'Template applied to distribution prompt.';
         fetchRealDistribution();
+      }
+    });
+    $('arenaTemplate').addEventListener('change', () => {
+      const key = $('arenaTemplate').value;
+      if (promptTemplates[key]) {
+        $('arenaPrompt').value = promptTemplates[key];
+        $('arenaStatus').textContent = 'Template applied to arena prompt.';
       }
     });
     $('themeSelect').addEventListener('change', () => applyTheme($('themeSelect').value));
@@ -1335,7 +1390,7 @@
 
     async function loadRound() {
       if (arenaFinished) return;
-      const prompt = arenaPrompts[round];
+      const prompt = $('arenaPrompt').value.trim() || arenaPrompts[round];
       const pair = arenaPairConfigs(prompt);
       const leftIsPrimary = Math.random() > 0.5;
 
