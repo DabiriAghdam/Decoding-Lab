@@ -786,7 +786,7 @@
                 <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp" selected>Top-p (Nucleus)</option>
-                <option value="sample">Pure Sampling (temp=t)</option>
+                <option value="sample">Pure Sampling</option>
               </select>
             </div>
 
@@ -797,7 +797,7 @@
 
             <div id="aTempWrap" class="field">
               <label for="aTemp">Temperature: <span id="aTempVal">1.00</span></label>
-              <input id="aTemp" type="range" min="0" max="1.8" step="0.05" value="1.00" />
+              <input id="aTemp" type="range" min="0" max="2.0" step="0.05" value="1.00" />
             </div>
 
             <div id="aTopkWrap" class="field">
@@ -836,7 +836,7 @@
                 <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp">Top-p (Nucleus)</option>
-                <option value="sample">Pure Sampling (temp=t)</option>
+                <option value="sample">Pure Sampling</option>
               </select>
             </div>
 
@@ -847,7 +847,7 @@
 
             <div id="bTempWrap" class="field">
               <label for="bTemp">Temperature: <span id="bTempVal">1.00</span></label>
-              <input id="bTemp" type="range" min="0" max="1.8" step="0.05" value="1.00" />
+              <input id="bTemp" type="range" min="0" max="2.0" step="0.05" value="1.00" />
             </div>
 
             <div id="bTopkWrap" class="field">
@@ -996,7 +996,7 @@
               <option value="beam">Beam Search</option>
               <option value="topk">Top-k</option>
               <option value="topp" selected>Top-p (Nucleus)</option>
-              <option value="sample">Pure Sampling (temp=t)</option>
+              <option value="sample">Pure Sampling</option>
               <option value="chart_click">Chart Click (Selected Token)</option>
             </select>
           </div>
@@ -1036,6 +1036,7 @@
               <option value="topp" selected>Top-p (Nucleus)</option>
               <option value="topk">Top-k</option>
               <option value="greedy">Greedy</option>
+              <option value="sample">Pure Sampling</option>
             </select>
           </div>
           <div class="field">
@@ -1044,7 +1045,7 @@
           </div>
           <div class="field">
             <label for="wmTemp">Temperature: <span id="wmTempVal">1.00</span></label>
-            <input id="wmTemp" type="range" min="0.10" max="1.80" step="0.05" value="1.00" />
+            <input id="wmTemp" type="range" min="0.00" max="2.00" step="0.05" value="1.00" />
           </div>
           <div class="field">
             <label for="wmTopP">Top-p: <span id="wmTopPVal">0.92</span></label>

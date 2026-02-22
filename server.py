@@ -352,6 +352,9 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         probs = torch.softmax(logits / temp, dim=-1)
         vocab_size = int(probs.shape[0])
 
+        if strategy == "sample":
+            return int(torch.multinomial(probs, 1).item())
+
         if strategy == "topk":
             k = max(1, min(int(top_k or 40), vocab_size))
             topk_probs, topk_idx = torch.topk(probs, k)
