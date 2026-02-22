@@ -80,7 +80,7 @@ def _load_runtime(model_id):
     return runtime
 
 
-class PresentationHandler(SimpleHTTPRequestHandler):
+class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
     def _send_json(self, status, payload):
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
@@ -506,7 +506,7 @@ class PresentationHandler(SimpleHTTPRequestHandler):
 
 def main():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    server = ThreadingHTTPServer((HOST, PORT), PresentationHandler)
+    server = ThreadingHTTPServer((HOST, PORT), DecodingLabAPIHandler)
     print(f"Serving Decoding Lab on http://{HOST}:{PORT}", flush=True)
     print("Using local Transformers backend via /api/local/*", flush=True)
     if torch is None:
