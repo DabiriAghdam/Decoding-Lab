@@ -501,6 +501,12 @@
       gap: 8px;
     }
 
+    .model-note {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
     .metric {
       border: 1px solid #d4e8dc;
       background: #edf9f1;
@@ -759,10 +765,10 @@
           <label for="model">Model</label>
           <select id="model">
             <option value="gpt2-large" selected>gpt2-large</option>
-            <option value="gpt2-xl">gpt2-xl</option>
-            <option value="gpt2-medium">gpt2-medium</option>
-            <option value="Qwen/Qwen3-0.6B">Qwen3-0.6B</option>
-            <option value="Qwen/Qwen2.5-0.5B">Qwen2.5-0.5B</option>
+            <option value="Qwen/Qwen2.5-0.5B">Qwen2.5-0.5B-Base</option>
+            <option value="Qwen/Qwen2.5-0.5B-Instruct">Qwen2.5-0.5B-Instruct</option>
+            <option value="HuggingFaceTB/SmolLM2-360M" >SmolLM2-360M-Base</option>
+            <option value="HuggingFaceTB/SmolLM2-360M-Instruct" >SmolLM2-360M-Instruct</option>
           </select>
         </div>
         <button id="preloadModel">Load Model</button>
@@ -822,6 +828,7 @@
         </span>
         <div id="genStatus" class="status"></div>
       </div>
+      <div id="tab1ModelNote" class="model-note"></div>
 
       <div class="grid-2">
         <article class="card compare-card">
@@ -928,6 +935,7 @@
 
     <section id="tab2" class="panel">
       <div class="card">
+        <div id="tab2ModelNote" class="model-note"></div>
         <div class="arena-head">
           <div style="display:grid;gap:8px;">
             <div class="chip">Blind decoding preference arena</div>
@@ -984,6 +992,7 @@
     <section id="tab3" class="panel active">
       <div class="dist-layout">
         <div class="card">
+          <div id="tab3ModelNote" class="model-note"></div>
           <div class="field">
             <label for="distTemplate">Prompt Template</label>
             <select id="distTemplate">
@@ -1069,6 +1078,7 @@
     <section id="tab4" class="panel">
       <div class="wm-grid">
         <div class="card">
+          <div id="tab4ModelNote" class="model-note"></div>
           <div class="field">
             <label for="wmTemplate">Prompt Template</label>
             <select id="wmTemplate">
@@ -1168,6 +1178,16 @@
 
     function apiConfig() {
       return { model: $('model').value.trim() || 'gpt2-large' };
+    }
+
+    const modelUsage = { tab1: null, tab2: null, tab3: null, tab4: null };
+
+    function updateModelNotes() {
+      const selected = apiConfig().model;
+      $('tab1ModelNote').textContent = `Selected model: ${selected} · Last side-by-side outputs: ${modelUsage.tab1 || 'not generated yet'}`;
+      $('tab2ModelNote').textContent = `Selected model: ${selected} · Last arena round: ${modelUsage.tab2 || 'not generated yet'}`;
+      $('tab3ModelNote').textContent = `Selected model: ${selected} · Last chart/distribution: ${modelUsage.tab3 || 'not generated yet'}`;
+      $('tab4ModelNote').textContent = `Selected model: ${selected} · Last watermark outputs: ${modelUsage.tab4 || 'not generated yet'}`;
     }
 
     function applyTheme(theme) {
@@ -1532,6 +1552,8 @@
         );
 
         outputEl.textContent = out.fullText;
+        modelUsage.tab1 = apiConfig().model;
+        updateModelNotes();
         outputEl.classList.remove('generating');
         metricPills(metricsEl, out.fullText, out.performance, out.usage);
         statusEl.textContent = 'Done.';
@@ -1591,6 +1613,7 @@
       }
     });
     $('themeSelect').addEventListener('change', () => applyTheme($('themeSelect').value));
+    $('model').addEventListener('change', updateModelNotes);
 
     $('preloadModel').addEventListener('click', async () => {
       const connStatus = $('connStatus');
@@ -1742,6 +1765,8 @@
       let leftIsPrimary = Math.random() > 0.5;
 
       roundPicked = false;
+      $('genRound').disabled = true;
+      $('nextRound').disabled = true;
       $('pickLeft').disabled = false;
       $('pickRight').disabled = false;
       $('roundNum').textContent = String(arenaRound + 1);
@@ -1772,9 +1797,16 @@
           $('rightMeta').textContent = `Tok/s ${Number(outFirst?.performance?.tokens_per_second || 0).toFixed(1)} · Generated ${Number(outFirst?.usage?.completion_tokens || 0)}`;
         }
 
+        modelUsage.tab2 = apiConfig().model;
+        updateModelNotes();
         $('arenaStatus').textContent = 'Round ready.';
       } catch (err) {
         $('arenaStatus').textContent = `Failed: ${err.message}`;
+      } finally {
+        if (!arenaFinished) {
+          $('genRound').disabled = false;
+          $('nextRound').disabled = !roundPicked;
+        }
       }
     }
 
@@ -1924,6 +1956,8 @@
                 if (wm.tokens_per_second != null) metrics.push(`WM Tok/s ${Number(wm.tokens_per_second).toFixed(1)}`);
                 if (plain.tokens_per_second != null) metrics.push(`Plain Tok/s ${Number(plain.tokens_per_second).toFixed(1)}`);
                 metricsEl.innerHTML = metrics.map((m) => `<span class="metric">${m}</span>`).join('');
+                modelUsage.tab4 = apiConfig().model;
+                updateModelNotes();
                 statusEl.textContent = 'Watermarked generation complete.';
                 try { await reader.cancel(); } catch (_) {}
                 break;
@@ -2201,6 +2235,8 @@
           top_p_rank: Number(dist.top_p_rank || 0),
           vocab_size: Number(dist.vocab_size || 0),
         };
+        modelUsage.tab3 = apiConfig().model;
+        updateModelNotes();
         drawDistribution();
         $('distStatus').textContent = 'Distribution loaded.';
       } catch (err) {
@@ -2349,6 +2385,7 @@
     }
     $('arenaStatus').textContent = 'Ready.';
     $('distStatus').textContent = 'Ready.';
+    updateModelNotes();
     updateNextStrategyHint();
     drawChartMessage('Click "Load Model" or open this tab to load distribution.');
 
