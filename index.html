@@ -2215,6 +2215,8 @@
         if (strategy === 'chart_click') {
           token = selectedChartToken;
           if (!token) throw new Error('Select a token from the chart first.');
+          selectedChartToken = '';
+          $('selectedTokenStatus').textContent = 'Selection consumed. Click a new token on the chart.';
         } else {
           const res = await fetch('/api/local/completions', {
             method: 'POST',
