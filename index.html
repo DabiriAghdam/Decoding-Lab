@@ -1046,11 +1046,6 @@
             </div>
 
             <div class="field">
-              <label for="nextBeam">Beam Size (b): <span id="nextBeamVal">4</span></label>
-              <input id="nextBeam" type="range" min="1" max="16" step="1" value="4" />
-            </div>
-
-            <div class="field">
               <label for="nextTokenStrategy">Next Token Strategy</label>
               <select id="nextTokenStrategy">
                 <option value="greedy">Greedy</option>
@@ -1222,7 +1217,6 @@
     attachRange('distN', 'distNVal');
     attachRange('kCut', 'kCutVal');
     attachRange('pCut', 'pCutVal', (v) => v.toFixed(2));
-    attachRange('nextBeam', 'nextBeamVal');
     attachRange('arenaMaxTokens', 'arenaMaxTokensVal');
     attachRange('wmMaxTokens', 'wmMaxTokensVal');
     attachRange('wmTemp', 'wmTempVal', (v) => v.toFixed(2));
@@ -2006,8 +2000,7 @@
       const temperature = 0.9;
       const topP = Number($('pCut').value);
       const topK = Number($('kCut').value);
-      const beamSize = Number($('nextBeam').value);
-      if (strategy === 'beam') return `Using Beam Search with b=${Math.max(1, beamSize || 4)}`;
+      if (strategy === 'beam') return 'Using Beam Search with b=4';
       if (strategy === 'topk') return `Using Top-k with k=${topK}`;
       if (strategy === 'topp') return `Using Top-p with p=${topP.toFixed(2)}`;
       if (strategy === 'sample') return `Using Pure Sampling with temp=${temperature.toFixed(2)}`;
@@ -2272,7 +2265,7 @@
         const temperature = 0.9;
         const topP = Number($('pCut').value);
         const topK = Number($('kCut').value);
-        const beamSize = Number($('nextBeam').value);
+        const beamSize = 4;
         const body = {
           model: apiConfig().model,
           prompt,
@@ -2343,7 +2336,6 @@
     $('undoToken').addEventListener('click', undoLastToken);
     $('distPrompt').addEventListener('input', () => scheduleDistRefresh(450));
     $('kCut').addEventListener('input', drawDistribution);
-    $('nextBeam').addEventListener('input', updateNextStrategyHint);
     $('nextTokenStrategy').addEventListener('change', updateNextStrategyHint);
     $('pCut').addEventListener('input', () => scheduleDistRefresh(220));
     $('pCut').addEventListener('input', updateNextStrategyHint);
