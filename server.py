@@ -33,6 +33,7 @@ else:
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8000"))
 DIST_CACHE_MAX_ENTRIES = int(os.environ.get("DIST_CACHE_MAX_ENTRIES", "128"))
+TOP_K_MAX = 320
 ALLOWED_DECODE_STRATEGIES = {"greedy", "beam", "topk", "topp", "sample"}
 ALLOWED_SAMPLING_STRATEGIES = {"greedy", "topk", "topp", "sample"}
 
@@ -160,6 +161,8 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             normalized["top_k"] = int(top_k)
             if normalized["top_k"] < 1:
                 raise ValueError("top_k must be >= 1 for top-k strategy")
+            if normalized["top_k"] > TOP_K_MAX:
+                raise ValueError(f"top_k must be <= {TOP_K_MAX} for top-k strategy")
             normalized["top_p"] = 1.0
             normalized["beam_size"] = 1
         elif strategy == "topp":
