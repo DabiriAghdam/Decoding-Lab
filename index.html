@@ -786,6 +786,7 @@
                 <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp" selected>Top-p (Nucleus)</option>
+                <option value="sample">Pure Sampling (temp=t)</option>
               </select>
             </div>
 
@@ -835,6 +836,7 @@
                 <option value="beam">Beam Search</option>
                 <option value="topk">Top-k</option>
                 <option value="topp">Top-p (Nucleus)</option>
+                <option value="sample">Pure Sampling (temp=t)</option>
               </select>
             </div>
 
@@ -885,6 +887,8 @@
               <select id="arenaPair">
                 <option value="random_blind">Random Pair (Blind)</option>
                 <option value="topp_vs_greedy">Top-p vs Greedy</option>
+                <option value="sample_vs_greedy">Pure Sampling vs Greedy</option>
+                <option value="sample_vs_topp">Pure Sampling vs Top-p</option>
                 <option value="beam_vs_greedy">Beam Search vs Greedy</option>
                 <option value="topk_vs_greedy">Top-k vs Greedy</option>
                 <option value="topp_vs_topk">Top-p vs Top-k</option>
@@ -992,6 +996,7 @@
               <option value="beam">Beam Search</option>
               <option value="topk">Top-k</option>
               <option value="topp" selected>Top-p (Nucleus)</option>
+              <option value="sample">Pure Sampling (temp=t)</option>
               <option value="chart_click">Chart Click (Selected Token)</option>
             </select>
           </div>
@@ -1127,6 +1132,7 @@
       if (v === 'greedy') return 'Greedy';
       if (v === 'beam') return 'Beam Search';
       if (v === 'topk') return 'Top-k';
+      if (v === 'sample') return 'Pure Sampling';
       return 'Top-p (Nucleus)';
     }
 
@@ -1283,6 +1289,11 @@
         body.top_k = cfg.top_k;
         return body;
       }
+      if (cfg.strategy === 'sample') {
+        body.temperature = cfg.temperature;
+        body.top_p = 1;
+        return body;
+      }
       if (cfg.strategy === 'topp') {
         body.temperature = cfg.temperature;
         body.top_p = cfg.top_p;
@@ -1399,7 +1410,7 @@
 
     function updateMethodControls(prefix) {
       const strategy = $(`${prefix}Strategy`).value;
-      const showTemp = strategy === 'topk' || strategy === 'topp';
+      const showTemp = strategy === 'topk' || strategy === 'topp' || strategy === 'sample';
       const showTopK = strategy === 'topk';
       const showTopP = strategy === 'topp';
       const showBeam = strategy === 'beam';
@@ -1573,6 +1584,7 @@
       'Beam Search': 0,
       'Top-k': 0,
       'Top-p (Nucleus)': 0,
+      'Pure Sampling': 0,
     };
 
     function arenaPairConfigs(prompt) {
@@ -1617,8 +1629,19 @@
         top_p: 1,
         max_tokens: arenaMaxTokens,
       };
+      const sample = {
+        model,
+        prompt,
+        strategy: 'sample',
+        temperature: 1.0,
+        top_k: 0,
+        top_p: 1,
+        max_tokens: arenaMaxTokens,
+      };
       const pool = [
         { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy' },
+        { left: sample, right: greedy, leftName: 'Pure Sampling', rightName: 'Greedy' },
+        { left: sample, right: topp, leftName: 'Pure Sampling', rightName: 'Top-p (Nucleus)' },
         { left: beam, right: greedy, leftName: 'Beam Search', rightName: 'Greedy' },
         { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy' },
         { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' },
@@ -1636,6 +1659,12 @@
       }
       if (pair === 'beam_vs_topp') {
         return { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)' };
+      }
+      if (pair === 'sample_vs_greedy') {
+        return { left: sample, right: greedy, leftName: 'Pure Sampling', rightName: 'Greedy' };
+      }
+      if (pair === 'sample_vs_topp') {
+        return { left: sample, right: topp, leftName: 'Pure Sampling', rightName: 'Top-p (Nucleus)' };
       }
       if (pair === 'topp_vs_topk') {
         return { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' };
@@ -1704,7 +1733,7 @@
       $('revealBox').innerHTML =
         `Left uses <strong>${leftMethod}</strong> | Right uses <strong>${rightMethod}</strong><br>` +
         `Current winner: <strong>${winner[0]}</strong> (${winner[1]} votes) · ` +
-        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam Search']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']}`;
+        `Greedy ${methodWins['Greedy']} | Beam ${methodWins['Beam Search']} | Top-k ${methodWins['Top-k']} | Top-p ${methodWins['Top-p (Nucleus)']} | Sampling ${methodWins['Pure Sampling']}`;
 
       if (arenaRound >= MAX_ARENA_ROUNDS - 1) {
         arenaFinished = true;
@@ -2156,6 +2185,9 @@
           body.temperature = temperature;
           body.top_p = 1;
           body.top_k = topK;
+        } else if (strategy === 'sample') {
+          body.temperature = temperature;
+          body.top_p = 1;
         } else if (strategy === 'topp') {
           body.temperature = temperature;
           body.top_p = topP;
@@ -2180,6 +2212,7 @@
         const strategyName =
           strategy === 'chart_click' ? 'chart-click' :
           strategy === 'beam' ? 'beam-search' :
+          strategy === 'sample' ? 'pure-sampling' :
           strategy === 'topp' ? 'top-p' :
           strategy === 'topk' ? 'top-k' : 'greedy';
         $('nextTokenStatus').textContent = `Added token (${strategyName}): ${safeTokenLabel(token)}`;
