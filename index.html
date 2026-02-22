@@ -1409,26 +1409,36 @@
       $(`sample${prefix.toUpperCase()}Title`).textContent = `Sample ${prefix.toUpperCase()} · ${label}`;
     }
 
+    const SAMPLE_STRATEGY_UI = {
+      greedy: { temp: false, topk: false, topp: false, beam: false },
+      beam: { temp: false, topk: false, topp: false, beam: true },
+      topk: { temp: true, topk: true, topp: false, beam: false },
+      topp: { temp: true, topk: false, topp: true, beam: false },
+      sample: { temp: true, topk: false, topp: false, beam: false },
+    };
+
+    const WM_STRATEGY_UI = {
+      greedy: { temp: false, topk: false, topp: false },
+      topk: { temp: true, topk: true, topp: false },
+      topp: { temp: true, topk: false, topp: true },
+      sample: { temp: true, topk: false, topp: false },
+    };
+
     function updateMethodControls(prefix) {
       const strategy = $(`${prefix}Strategy`).value;
-      const showTemp = strategy === 'topk' || strategy === 'topp' || strategy === 'sample';
-      const showTopK = strategy === 'topk';
-      const showTopP = strategy === 'topp';
-      const showBeam = strategy === 'beam';
-      $(`${prefix}TempWrap`).style.display = showTemp ? '' : 'none';
-      $(`${prefix}TopkWrap`).style.display = showTopK ? '' : 'none';
-      $(`${prefix}ToppWrap`).style.display = showTopP ? '' : 'none';
-      $(`${prefix}BeamWrap`).style.display = showBeam ? '' : 'none';
+      const cfg = SAMPLE_STRATEGY_UI[strategy] || SAMPLE_STRATEGY_UI.topp;
+      $(`${prefix}TempWrap`).style.display = cfg.temp ? '' : 'none';
+      $(`${prefix}TopkWrap`).style.display = cfg.topk ? '' : 'none';
+      $(`${prefix}ToppWrap`).style.display = cfg.topp ? '' : 'none';
+      $(`${prefix}BeamWrap`).style.display = cfg.beam ? '' : 'none';
     }
 
     function updateWmControls() {
       const strategy = $('wmStrategy').value;
-      const showTemp = strategy === 'topk' || strategy === 'topp' || strategy === 'sample';
-      const showTopK = strategy === 'topk';
-      const showTopP = strategy === 'topp';
-      $('wmTemp').closest('.field').style.display = showTemp ? '' : 'none';
-      $('wmTopKWrap').style.display = showTopK ? '' : 'none';
-      $('wmTopPWrap').style.display = showTopP ? '' : 'none';
+      const cfg = WM_STRATEGY_UI[strategy] || WM_STRATEGY_UI.topp;
+      $('wmTemp').closest('.field').style.display = cfg.temp ? '' : 'none';
+      $('wmTopKWrap').style.display = cfg.topk ? '' : 'none';
+      $('wmTopPWrap').style.display = cfg.topp ? '' : 'none';
     }
 
     ['aStrategy', 'aTemp', 'aTopk', 'aTopp', 'aBeam'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('a')));
