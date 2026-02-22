@@ -840,10 +840,6 @@
 
       <div class="toolbar">
         <button id="generateBoth" class="primary">Generate Both Samples</button>
-        <label class="chip" style="width:max-content;">
-          <input id="showSampleTrace" type="checkbox" />
-          Show token probability plot
-        </label>
         <span class="metric-help-wrap">
           <button class="metric-help" type="button" aria-label="Metric definitions">?</button>
           <span class="metric-help-pop">
@@ -852,6 +848,10 @@
             Generated: completion token count.
           </span>
         </span>
+        <label class="chip" style="width:max-content;">
+          <input id="showSampleTrace" type="checkbox" />
+          Show token probability plot
+        </label>
         <div id="genStatus" class="status"></div>
       </div>
       <div id="tab1ModelNote" class="model-note"></div>
