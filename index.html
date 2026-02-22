@@ -1961,6 +1961,20 @@
         .replace(/ /g, '.');
     }
 
+    function nextTokenModeLabel() {
+      const strategy = $('nextTokenStrategy').value;
+      const temperature = 0.9;
+      const topP = Number($('pCut').value);
+      const topK = Number($('kCut').value);
+      const beamSize = Number($('nextBeam').value);
+      if (strategy === 'beam') return `Next-token mode: Beam Search (b=${Math.max(1, beamSize || 4)})`;
+      if (strategy === 'topk') return `Next-token mode: Top-k (k=${topK}, temp=${temperature.toFixed(2)})`;
+      if (strategy === 'topp') return `Next-token mode: Top-p (p=${topP.toFixed(2)}, temp=${temperature.toFixed(2)})`;
+      if (strategy === 'sample') return `Next-token mode: Pure Sampling (temp=${temperature.toFixed(2)})`;
+      if (strategy === 'chart_click') return 'Next-token mode: Chart Click (manual token)';
+      return 'Next-token mode: Greedy (deterministic)';
+    }
+
     function drawChartMessage(message) {
       if (typeof Plotly === 'undefined') {
         $('distStatus').textContent = 'Plotly failed to load. Check internet and refresh.';
@@ -1981,6 +1995,15 @@
           showarrow: false,
           text: message,
           font: { size: 16 },
+        }, {
+          x: 0.99,
+          y: 1.08,
+          xref: 'paper',
+          yref: 'paper',
+          xanchor: 'right',
+          showarrow: false,
+          text: nextTokenModeLabel(),
+          font: { size: 11, color: '#1f4a34' },
         }],
         paper_bgcolor: paperBg,
         plot_bgcolor: plotBg,
@@ -2115,6 +2138,16 @@
               text: pLen <= x.length ? `Top-p boundary (n=${pLen})` : `Top-p boundary (n=${pLen}, off-chart)`,
               showarrow: false,
               font: { size: 12, color: topPLine },
+            },
+            {
+              x: 0.99,
+              y: 1.08,
+              xref: 'paper',
+              yref: 'paper',
+              xanchor: 'right',
+              showarrow: false,
+              text: nextTokenModeLabel(),
+              font: { size: 11, color: '#1f4a34' },
             },
           ],
           hoverlabel: {
@@ -2283,6 +2316,8 @@
     $('undoToken').addEventListener('click', undoLastToken);
     $('distPrompt').addEventListener('input', () => scheduleDistRefresh(450));
     $('kCut').addEventListener('input', drawDistribution);
+    $('nextBeam').addEventListener('input', drawDistribution);
+    $('nextTokenStrategy').addEventListener('change', drawDistribution);
     $('pCut').addEventListener('input', () => scheduleDistRefresh(220));
     $('distN').addEventListener('change', fetchRealDistribution);
     window.addEventListener('resize', drawDistribution);
