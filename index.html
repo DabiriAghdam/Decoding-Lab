@@ -124,7 +124,7 @@
 
     .hero-row {
       display: grid;
-      grid-template-columns: auto auto auto;
+      grid-template-columns: auto auto;
       gap: 10px;
       align-items: end;
       justify-content: start;
@@ -138,6 +138,14 @@
     .model-compact select {
       font-size: 0.92rem;
       padding: 8px 10px;
+    }
+
+    .theme-topright {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 180px;
+      z-index: 3;
     }
 
     body[data-theme="ocean"] {
@@ -613,6 +621,10 @@
     }
 
     @media (max-width: 1120px) {
+      .theme-topright {
+        position: static;
+        width: auto;
+      }
       .hero-row { grid-template-columns: 1fr; }
       .toolbar { grid-template-columns: 1fr; }
       .grid-2,
@@ -632,6 +644,14 @@
       <h1 class="hero-title">Decoding Control Center · Neural Text Degeneration Explorer</h1>
       <p class="hero-subtitle">Built for exploring Holtzman et al. (2019) and beyond, as a presentation dashboard for CPSC 532B.</p>
       <p class="hero-note">Project scope: interactive comparison of greedy, top-k, top-p, and beam search with live distribution analysis and blind preference rounds.</p>
+      <div class="field theme-topright">
+        <label for="themeSelect">Theme</label>
+        <select id="themeSelect">
+          <option value="forest" selected>Forest Light</option>
+          <option value="ocean">Ocean Light</option>
+          <option value="night">Night Mode</option>
+        </select>
+      </div>
       <div class="hero-row">
         <div class="field model-compact">
           <label for="model">Model</label>
@@ -641,20 +661,13 @@
             <option value="gpt2-large" selected>gpt2-large</option>
             <option value="gpt2-xl">gpt2-xl</option>
             <option value="distilgpt2">distilgpt2</option>
+            <option value="Qwen/Qwen3-0.6B">Qwen3-0.6B</option>
             <option value="EleutherAI/pythia-410m-deduped">EleutherAI/pythia-410m-deduped</option>
             <option value="Qwen/Qwen2.5-0.5B">Qwen/Qwen2.5-0.5B</option>
             <option value="TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T">TinyLlama-1.1B</option>
           </select>
         </div>
-        <div class="field">
-          <label for="themeSelect">Theme</label>
-          <select id="themeSelect">
-            <option value="forest" selected>Forest Light</option>
-            <option value="ocean">Ocean Light</option>
-            <option value="night">Night Mode</option>
-          </select>
-        </div>
-        <button id="preloadModel">Preload Model</button>
+        <button id="preloadModel">Load Model</button>
       </div>
       <div id="connStatus" class="status"></div>
       <div id="serverWarning" class="server-warning"></div>
@@ -819,6 +832,7 @@
             <div class="field">
               <label for="arenaPair">Method Pair</label>
               <select id="arenaPair">
+                <option value="random_blind">Random Pair (Blind)</option>
                 <option value="topp_vs_greedy">Top-p vs Greedy</option>
                 <option value="beam_vs_greedy">Beam Search vs Greedy</option>
                 <option value="topk_vs_greedy">Top-k vs Greedy</option>
@@ -1461,6 +1475,17 @@
         max_tokens: arenaMaxTokens,
         stream: true,
       };
+      const pool = [
+        { left: topp, right: greedy, leftName: 'Top-p (Nucleus)', rightName: 'Greedy' },
+        { left: beam, right: greedy, leftName: 'Beam Search', rightName: 'Greedy' },
+        { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy' },
+        { left: topp, right: topk, leftName: 'Top-p (Nucleus)', rightName: 'Top-k' },
+        { left: beam, right: topp, leftName: 'Beam Search', rightName: 'Top-p (Nucleus)' },
+      ];
+      if (pair === 'random_blind') {
+        const picked = pool[Math.floor(Math.random() * pool.length)];
+        return { ...picked, randomPair: true };
+      }
       if (pair === 'topk_vs_greedy') {
         return { left: topk, right: greedy, leftName: 'Top-k', rightName: 'Greedy', targetName: 'Top-k' };
       }
@@ -1488,7 +1513,9 @@
       $('roundNum').textContent = String(arenaRound + 1);
       $('roundResult').textContent = '';
       $('revealBox').textContent = '';
-      $('arenaStatus').textContent = 'Generating round...';
+      $('arenaStatus').textContent = pair.randomPair
+        ? 'Generating round with a hidden random method pair...'
+        : 'Generating round...';
       $('leftMeta').textContent = '';
       $('rightMeta').textContent = '';
       $('leftText').textContent = 'Generating...';
