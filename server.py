@@ -342,6 +342,132 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             "vocab_size": vocab_size,
         }
 
+    def _sample_from_logits(self, logits, strategy, temperature, top_p, top_k):
+        strategy = (strategy or "topp").strip().lower()
+        if strategy == "greedy":
+            return int(torch.argmax(logits).item())
+
+        temp = max(float(temperature), 0.05)
+        probs = torch.softmax(logits / temp, dim=-1)
+        vocab_size = int(probs.shape[0])
+
+        if strategy == "topk":
+            k = max(1, min(int(top_k or 40), vocab_size))
+            topk_probs, topk_idx = torch.topk(probs, k)
+            denom = torch.sum(topk_probs)
+            if float(denom.item()) <= 0:
+                return int(topk_idx[0].item())
+            topk_probs = topk_probs / denom
+            sample_idx = int(torch.multinomial(topk_probs, 1).item())
+            return int(topk_idx[sample_idx].item())
+
+        p = min(max(float(top_p), 0.01), 1.0)
+        sorted_probs, sorted_idx = torch.sort(probs, descending=True)
+        cumulative = torch.cumsum(sorted_probs, dim=-1)
+        remove_mask = cumulative > p
+        remove_mask[0] = False
+        filtered = sorted_probs.masked_fill(remove_mask, 0.0)
+        denom = torch.sum(filtered)
+        if float(denom.item()) <= 0:
+            return int(sorted_idx[0].item())
+        filtered = filtered / denom
+        sample_idx = int(torch.multinomial(filtered, 1).item())
+        return int(sorted_idx[sample_idx].item())
+
+    def _kgw_seed(self, prev_token_id, seeding_key):
+        prev_tok = int(prev_token_id) & 0xFFFFFFFF
+        key = int(seeding_key) & 0xFFFFFFFF
+        return ((prev_tok * 2654435761) ^ (key * 2246822519)) & 0xFFFFFFFF
+
+    def _kgw_green_mask(self, runtime, vocab_size, seed, gamma, device):
+        key = f"{device}:{vocab_size}"
+        ids = runtime["vocab_ids_cache"].get(key)
+        if ids is None or int(ids.shape[0]) != int(vocab_size):
+            ids = torch.arange(vocab_size, dtype=torch.int64, device=device)
+            runtime["vocab_ids_cache"][key] = ids
+
+        seed_t = torch.full_like(ids, int(seed), dtype=torch.int64)
+        x = torch.bitwise_xor(ids, seed_t)
+        x = torch.bitwise_and(x * 0x9E3779B1, 0xFFFFFFFF)
+        x = torch.bitwise_xor(x, torch.bitwise_right_shift(x, 16))
+        x = torch.bitwise_and(x * 0x85EBCA77, 0xFFFFFFFF)
+        x = torch.bitwise_xor(x, torch.bitwise_right_shift(x, 13))
+        threshold = int(min(max(float(gamma), 0.01), 0.99) * 4294967295.0)
+        return x <= threshold
+
+    def _generate_kgw_watermarked(
+        self,
+        runtime,
+        prompt,
+        max_tokens,
+        strategy,
+        temperature,
+        top_p,
+        top_k,
+        gamma,
+        delta,
+        seeding_key,
+    ):
+        tokenizer = runtime["tokenizer"]
+        model = runtime["model"]
+        device = runtime["device"]
+
+        inputs = tokenizer(prompt, return_tensors="pt")
+        input_ids = inputs["input_ids"].to(device)
+        attention_mask = inputs.get("attention_mask")
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(device)
+        else:
+            attention_mask = torch.ones_like(input_ids, device=device)
+
+        max_tokens = max(1, min(int(max_tokens), 200))
+        gamma = min(max(float(gamma), 0.01), 0.99)
+        delta = float(delta)
+
+        generated = []
+        token_meta = []
+        started = time.perf_counter()
+        eos_id = tokenizer.eos_token_id
+
+        with torch.inference_mode():
+            for _ in range(max_tokens):
+                logits = model(input_ids=input_ids, attention_mask=attention_mask).logits[0, -1, :]
+                prev_token = int(input_ids[0, -1].item())
+                seed = self._kgw_seed(prev_token, seeding_key)
+                green_mask = self._kgw_green_mask(runtime, int(logits.shape[0]), seed, gamma, device)
+                adjusted = logits + green_mask.to(logits.dtype) * delta
+
+                next_token = self._sample_from_logits(
+                    logits=adjusted,
+                    strategy=strategy,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k=top_k,
+                )
+                generated.append(next_token)
+                is_green = bool(green_mask[next_token].item())
+                tok_text = tokenizer.decode([next_token], clean_up_tokenization_spaces=False)
+                token_meta.append({"id": int(next_token), "text": tok_text, "green": is_green})
+
+                next_tok = torch.tensor([[next_token]], dtype=input_ids.dtype, device=device)
+                input_ids = torch.cat([input_ids, next_tok], dim=1)
+                attention_mask = torch.cat([attention_mask, torch.ones((1, 1), dtype=attention_mask.dtype, device=device)], dim=1)
+                if eos_id is not None and next_token == int(eos_id):
+                    break
+
+        elapsed_s = max(time.perf_counter() - started, 1e-6)
+        text = tokenizer.decode(generated, skip_special_tokens=True)
+        completion_tokens = len(generated)
+        prompt_tokens = int(inputs["input_ids"].shape[1])
+        return {
+            "text": text,
+            "tokens": token_meta,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "elapsed_ms": int(round(elapsed_s * 1000)),
+            "tokens_per_second": float(completion_tokens / elapsed_s) if completion_tokens > 0 else 0.0,
+        }
+
     def do_OPTIONS(self):
         if self.path.startswith("/api/"):
             self.send_response(204)
@@ -492,6 +618,49 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                         "top_k_rank": dist["top_k_rank"],
                         "top_p_rank": dist["top_p_rank"],
                         "vocab_size": dist["vocab_size"],
+                    },
+                )
+            except Exception as exc:
+                self._send_json(500, {"error": str(exc)})
+            return
+
+        if self.path == "/api/local/watermark/completions":
+            model_id = _normalize_model_id(body.get("model"))
+            prompt = body.get("prompt")
+            if not prompt:
+                self._send_json(400, {"error": "prompt is required"})
+                return
+            try:
+                runtime = _load_runtime(model_id)
+                gen = self._generate_kgw_watermarked(
+                    runtime=runtime,
+                    prompt=prompt,
+                    max_tokens=body.get("max_tokens", 80),
+                    strategy=body.get("strategy", "topp"),
+                    temperature=body.get("temperature", 1.0),
+                    top_p=body.get("top_p", 0.92),
+                    top_k=body.get("top_k", 40),
+                    gamma=body.get("gamma", 0.25),
+                    delta=body.get("delta", 2.0),
+                    seeding_key=body.get("seeding_key", 15485863),
+                )
+                self._send_json(
+                    200,
+                    {
+                        "id": f"wm-{int(time.time() * 1000)}",
+                        "object": "watermarked_completion",
+                        "model": model_id,
+                        "choices": [{"index": 0, "text": gen["text"], "finish_reason": "stop"}],
+                        "tokens": gen["tokens"],
+                        "usage": {
+                            "prompt_tokens": gen["prompt_tokens"],
+                            "completion_tokens": gen["completion_tokens"],
+                            "total_tokens": gen["prompt_tokens"] + gen["completion_tokens"],
+                        },
+                        "performance": {
+                            "elapsed_ms": gen["elapsed_ms"],
+                            "tokens_per_second": gen["tokens_per_second"],
+                        },
                     },
                 )
             except Exception as exc:

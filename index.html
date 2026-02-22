@@ -265,7 +265,7 @@
 
     .tabs {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -606,6 +606,51 @@
       box-shadow: var(--shadow-sm);
     }
 
+    .wm-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .wm-output {
+      min-height: 280px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .wm-token {
+      display: inline-block;
+      margin: 2px 3px 2px 0;
+      padding: 2px 5px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .wm-token.green {
+      background: rgba(19, 108, 68, 0.16);
+      border-color: rgba(19, 108, 68, 0.38);
+      color: #145437;
+    }
+
+    .wm-token.red {
+      background: rgba(180, 35, 24, 0.12);
+      border-color: rgba(180, 35, 24, 0.32);
+      color: #7f1d17;
+    }
+
+    .wm-legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
     body[data-theme="night"] .site-footer {
       background: #11202b;
     }
@@ -623,7 +668,8 @@
       .controls { grid-template-columns: 1fr; }
       .dist-output-grid,
       .dist-controls-grid,
-      .dist-actions { grid-template-columns: 1fr; }
+      .dist-actions,
+      .wm-grid { grid-template-columns: 1fr; }
       #tailChart { height: 360px; }
     }
   </style>
@@ -667,6 +713,7 @@
       <button class="tab-btn active" data-tab="tab3">Distribution Explorer</button>
       <button class="tab-btn" data-tab="tab1">Side-by-Side Decode</button>
       <button class="tab-btn" data-tab="tab2">Human Preference Arena</button>
+      <button class="tab-btn" data-tab="tab4">KGW Watermark</button>
     </nav>
 
     <section id="tab1" class="panel">
@@ -943,6 +990,78 @@
         </div>
       </div>
     </section>
+
+    <section id="tab4" class="panel">
+      <div class="wm-grid">
+        <div class="card">
+          <div class="field">
+            <label for="wmTemplate">Prompt Template</label>
+            <select id="wmTemplate">
+              <option value="paper_appendix_life">Paper Appendix · So what's new in my life?</option>
+              <option value="paper_unicorn">Paper · In a shocking finding, scientists discovered</option>
+              <option value="paper_university">Paper · The university said in a statement that</option>
+              <option value="paper_city">Paper · The city council announced that</option>
+              <option value="paper_fig5_flat">Paper Fig 5 · She said, " I never</option>
+              <option value="paper_fig5_peaked">Paper Fig 5 · I ate the pizza while it was still</option>
+              <option value="city_billboard">Reactive city billboard story</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="wmPrompt">Watermark Prompt</label>
+            <textarea id="wmPrompt">So what's new in my life?</textarea>
+          </div>
+
+          <div class="field">
+            <label for="wmStrategy">Decoding Strategy</label>
+            <select id="wmStrategy">
+              <option value="topp" selected>Top-p (Nucleus)</option>
+              <option value="topk">Top-k</option>
+              <option value="greedy">Greedy</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="wmMaxTokens">Max Tokens: <span id="wmMaxTokensVal">80</span></label>
+            <input id="wmMaxTokens" type="range" min="10" max="200" step="10" value="80" />
+          </div>
+          <div class="field">
+            <label for="wmTemp">Temperature: <span id="wmTempVal">1.00</span></label>
+            <input id="wmTemp" type="range" min="0.10" max="1.80" step="0.05" value="1.00" />
+          </div>
+          <div class="field">
+            <label for="wmTopP">Top-p: <span id="wmTopPVal">0.92</span></label>
+            <input id="wmTopP" type="range" min="0.10" max="1.00" step="0.01" value="0.92" />
+          </div>
+          <div class="field">
+            <label for="wmTopK">Top-k: <span id="wmTopKVal">40</span></label>
+            <input id="wmTopK" type="range" min="1" max="120" step="1" value="40" />
+          </div>
+          <div class="field">
+            <label for="wmGamma">Gamma (green ratio): <span id="wmGammaVal">0.25</span></label>
+            <input id="wmGamma" type="range" min="0.05" max="0.80" step="0.01" value="0.25" />
+          </div>
+          <div class="field">
+            <label for="wmDelta">Delta (bias): <span id="wmDeltaVal">2.00</span></label>
+            <input id="wmDelta" type="range" min="0.00" max="5.00" step="0.10" value="2.00" />
+          </div>
+          <div class="field">
+            <label for="wmKey">Seeding Key</label>
+            <input id="wmKey" type="text" value="15485863" />
+          </div>
+
+          <button id="wmGenerate" class="primary">Generate Watermarked Text</button>
+          <div id="wmStatus" class="status"></div>
+        </div>
+
+        <div class="card">
+          <div class="wm-legend">
+            <span><span class="wm-token green">green</span> in greenlist</span>
+            <span><span class="wm-token red">red</span> out of greenlist</span>
+          </div>
+          <div id="wmOutput" class="mono wm-output"></div>
+          <div id="wmMetrics" class="metrics"></div>
+        </div>
+      </div>
+    </section>
   </div>
   <footer class="site-footer">Made with ❤️ for CPSC 532B · Decoding Dashboard Explorer</footer>
 
@@ -1012,6 +1131,12 @@
     attachRange('kCut', 'kCutVal');
     attachRange('pCut', 'pCutVal', (v) => v.toFixed(2));
     attachRange('arenaMaxTokens', 'arenaMaxTokensVal');
+    attachRange('wmMaxTokens', 'wmMaxTokensVal');
+    attachRange('wmTemp', 'wmTempVal', (v) => v.toFixed(2));
+    attachRange('wmTopP', 'wmTopPVal', (v) => v.toFixed(2));
+    attachRange('wmTopK', 'wmTopKVal');
+    attachRange('wmGamma', 'wmGammaVal', (v) => v.toFixed(2));
+    attachRange('wmDelta', 'wmDeltaVal', (v) => v.toFixed(2));
 
     function mergePromptCompletion(prompt, completion) {
       const p = (prompt || '').trim();
@@ -1041,6 +1166,15 @@
       museum_diary: 'When the museum digitized every diary, historians were shocked because',
       weather_mood: 'The AI weather report stopped predicting rain and started predicting moods.'
     };
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
     function tokenWords(text) {
       return (text || '')
@@ -1339,6 +1473,13 @@
         fetchRealDistribution();
       }
     });
+    $('wmTemplate').addEventListener('change', () => {
+      const key = $('wmTemplate').value;
+      if (promptTemplates[key]) {
+        $('wmPrompt').value = promptTemplates[key];
+        $('wmStatus').textContent = 'Template applied to watermark prompt.';
+      }
+    });
     $('themeSelect').addEventListener('change', () => applyTheme($('themeSelect').value));
 
     $('preloadModel').addEventListener('click', async () => {
@@ -1586,6 +1727,60 @@
       $('pickLeft').disabled = false;
       $('pickRight').disabled = false;
     });
+
+    async function generateWatermarked() {
+      const statusEl = $('wmStatus');
+      const outEl = $('wmOutput');
+      const metricsEl = $('wmMetrics');
+      $('wmGenerate').disabled = true;
+      statusEl.textContent = 'Generating with KGW watermark...';
+      outEl.textContent = 'Generating...';
+      outEl.classList.add('generating');
+      metricsEl.innerHTML = '';
+      try {
+        const body = {
+          model: apiConfig().model,
+          prompt: ($('wmPrompt').value || '').trim() || "So what's new in my life?",
+          strategy: $('wmStrategy').value,
+          max_tokens: Number($('wmMaxTokens').value),
+          temperature: Number($('wmTemp').value),
+          top_p: Number($('wmTopP').value),
+          top_k: Number($('wmTopK').value),
+          gamma: Number($('wmGamma').value),
+          delta: Number($('wmDelta').value),
+          seeding_key: Number(($('wmKey').value || '15485863').trim()) || 15485863,
+        };
+        const res = await fetch('/api/local/watermark/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
+        const data = await res.json();
+        const tokens = Array.isArray(data?.tokens) ? data.tokens : [];
+        outEl.innerHTML = tokens
+          .map((t) => `<span class="wm-token ${t.green ? 'green' : 'red'}">${escapeHtml(t.text)}</span>`)
+          .join('');
+        const greenCount = tokens.filter((t) => t.green).length;
+        const greenRate = tokens.length ? (100 * greenCount / tokens.length) : 0;
+        const metrics = [
+          `Green tokens ${greenCount}/${tokens.length}`,
+          `Green rate ${greenRate.toFixed(1)}%`,
+        ];
+        if (data?.performance?.tokens_per_second != null) metrics.push(`Tok/s ${Number(data.performance.tokens_per_second).toFixed(1)}`);
+        if (data?.usage?.completion_tokens != null) metrics.push(`Generated ${data.usage.completion_tokens}`);
+        metricsEl.innerHTML = metrics.map((m) => `<span class="metric">${m}</span>`).join('');
+        statusEl.textContent = 'Watermarked generation complete.';
+      } catch (err) {
+        statusEl.textContent = `Failed: ${err.message}`;
+        outEl.textContent = '';
+      } finally {
+        outEl.classList.remove('generating');
+        $('wmGenerate').disabled = false;
+      }
+    }
+
+    $('wmGenerate').addEventListener('click', generateWatermarked);
 
     const tailChartEl = $('tailChart');
     let distTokens = [];
