@@ -565,6 +565,18 @@
       grid-template-columns: 1fr;
     }
 
+    .mono.generating {
+      background:
+        linear-gradient(90deg, rgba(36, 120, 79, 0.08), rgba(36, 120, 79, 0.16), rgba(36, 120, 79, 0.08));
+      background-size: 220% 100%;
+      animation: loadingSweep 1.2s linear infinite;
+    }
+
+    @keyframes loadingSweep {
+      from { background-position: 200% 0; }
+      to { background-position: -200% 0; }
+    }
+
     .kpis {
       display: grid;
       gap: 8px;
@@ -1942,14 +1954,3 @@
   </script>
 </body>
 </html>
-    .mono.generating {
-      background:
-        linear-gradient(90deg, rgba(36, 120, 79, 0.08), rgba(36, 120, 79, 0.16), rgba(36, 120, 79, 0.08));
-      background-size: 220% 100%;
-      animation: loadingSweep 1.2s linear infinite;
-    }
-
-    @keyframes loadingSweep {
-      from { background-position: 200% 0; }
-      to { background-position: -200% 0; }
-    }
