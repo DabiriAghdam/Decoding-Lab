@@ -426,11 +426,6 @@
       gap: 10px;
     }
 
-    .arena-top {
-      display: grid;
-      gap: 8px;
-    }
-
     .arena-score {
       font-size: 0.9rem;
       color: var(--muted);
@@ -500,10 +495,14 @@
 
     #tailChart {
       width: 100%;
-      height: 500px;
+      height: 430px;
       border: 1px solid #cfe2d5;
       border-radius: 14px;
       background: #fff;
+    }
+
+    #distPrompt {
+      min-height: 72px;
     }
 
     .kpis {
@@ -551,7 +550,7 @@
       .dist-output-grid,
       .dist-controls-grid,
       .dist-actions { grid-template-columns: 1fr; }
-      #tailChart { height: 420px; }
+      #tailChart { height: 360px; }
     }
   </style>
 </head>
@@ -733,34 +732,11 @@
     <section id="tab2" class="panel">
       <div class="card">
         <div class="arena-head">
-          <div class="arena-top">
+          <div style="display:grid;gap:8px;">
             <div class="chip">Blind decoding preference arena</div>
             <div class="arena-score">
               Round <span id="roundNum">1</span>/5 · Selections <span id="scoreNum">0</span>
               <span id="roundResult" style="margin-left:8px;"></span>
-            </div>
-            <div class="field">
-              <label for="arenaTemplate">Prompt Template</label>
-              <select id="arenaTemplate">
-                <option value="paper_unicorn">Paper · In a shocking finding, scientists discovered</option>
-                <option value="paper_university">Paper · The university said in a statement that</option>
-                <option value="paper_city">Paper · The city council announced that</option>
-                <option value="paper_museum">Paper · The museum curator explained that</option>
-                <option value="paper_story">Paper · Once upon a time, in a small village</option>
-                <option value="paper_essay">Paper · The meaning of life is</option>
-                <option value="paper_news">Paper · The report found that</option>
-                <option value="paper_fig5_flat">Paper Fig 5 · She said, \" I never</option>
-                <option value="paper_fig5_peaked">Paper Fig 5 · I ate the pizza while it was still</option>
-                <option value="city_billboard">Reactive city billboard story</option>
-                <option value="receipt_poetry">Receipt poetry at midnight</option>
-                <option value="satellite_last">Satellite final message</option>
-                <option value="museum_diary">Museum digitized diaries</option>
-                <option value="weather_mood">Weather report predicts moods</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="arenaPrompt">Arena Prompt</label>
-              <textarea id="arenaPrompt">In a shocking finding, scientists discovered</textarea>
             </div>
           </div>
 
@@ -1231,13 +1207,6 @@
         fetchRealDistribution();
       }
     });
-    $('arenaTemplate').addEventListener('change', () => {
-      const key = $('arenaTemplate').value;
-      if (promptTemplates[key]) {
-        $('arenaPrompt').value = promptTemplates[key];
-        $('arenaStatus').textContent = 'Template applied to arena prompt.';
-      }
-    });
     $('themeSelect').addEventListener('change', () => applyTheme($('themeSelect').value));
 
     $('testConn').addEventListener('click', async () => {
@@ -1390,7 +1359,7 @@
 
     async function loadRound() {
       if (arenaFinished) return;
-      const prompt = $('arenaPrompt').value.trim() || arenaPrompts[round];
+      const prompt = arenaPrompts[round];
       const pair = arenaPairConfigs(prompt);
       const leftIsPrimary = Math.random() > 0.5;
 
@@ -1854,6 +1823,7 @@
     drawChartMessage('Click "Preload Model" or open this tab to load distribution.');
 
     checkApiServer();
+    setTimeout(() => { $('preloadModel').click(); }, 0);
   </script>
 </body>
 </html>
