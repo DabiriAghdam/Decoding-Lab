@@ -136,7 +136,7 @@
     }
 
     .model-compact select {
-      font-size: 0.92rem;
+      font-size: 0.95rem;
       padding: 8px 10px;
     }
 
@@ -320,7 +320,7 @@
     }
 
     .status.error { color: var(--danger); }
-
+      .status.error { color: #e53935; }
     body[data-theme="night"] input[type="text"],
     body[data-theme="night"] textarea,
     body[data-theme="night"] select,
@@ -862,8 +862,8 @@
             </div>
 
             <div id="aToppWrap" class="field">
-              <label for="aTopp">Top-p: <span id="aToppVal">0.92</span></label>
-              <input id="aTopp" type="range" min="0.10" max="1.00" step="0.01" value="0.92" />
+              <label for="aTopp">Top-p: <span id="aToppVal">0.95</span></label>
+              <input id="aTopp" type="range" min="0.10" max="1.00" step="0.01" value="0.95" />
             </div>
 
             <div id="aBeamWrap" class="field">
@@ -912,8 +912,8 @@
             </div>
 
             <div id="bToppWrap" class="field">
-              <label for="bTopp">Top-p: <span id="bToppVal">0.92</span></label>
-              <input id="bTopp" type="range" min="0.10" max="1.00" step="0.01" value="0.92" />
+              <label for="bTopp">Top-p: <span id="bToppVal">0.95</span></label>
+              <input id="bTopp" type="range" min="0.10" max="1.00" step="0.01" value="0.95" />
             </div>
 
             <div id="bBeamWrap" class="field">
@@ -1105,8 +1105,8 @@
             <input id="wmTemp" type="range" min="0.00" max="2.00" step="0.05" value="1.00" />
           </div>
           <div class="field" id="wmTopPWrap">
-            <label for="wmTopP">Top-p: <span id="wmTopPVal">0.92</span></label>
-            <input id="wmTopP" type="range" min="0.10" max="1.00" step="0.01" value="0.92" />
+            <label for="wmTopP">Top-p: <span id="wmTopPVal">0.95</span></label>
+            <input id="wmTopP" type="range" min="0.10" max="1.00" step="0.01" value="0.95" />
           </div>
           <div class="field" id="wmTopKWrap">
             <label for="wmTopK">Top-k: <span id="wmTopKVal">40</span></label>
@@ -1684,7 +1684,7 @@
         strategy: 'topp',
         temperature: 0.95,
         top_k: 40,
-        top_p: 0.92,
+        top_p: 0.95,
         max_tokens: arenaMaxTokens,
       };
       const beam = {
@@ -1943,7 +1943,8 @@
           }
         }
       } catch (err) {
-        statusEl.textContent = `Failed: ${err.message}`;
+          statusEl.textContent = `Failed: ${err.message}`;
+          statusEl.classList.add('error');
         outEl.textContent = '';
         outPlainEl.textContent = '';
       } finally {
@@ -2157,7 +2158,7 @@
           annotations: [
             {
               x: kBoundaryX,
-              y: yMax * 0.92,
+              y: yMax * 0.95,
               text: k <= x.length ? `Top-k boundary (k=${k})` : `Top-k boundary (k=${k}, off-chart)`,
               showarrow: false,
               font: { size: 11, color: topKLine },
