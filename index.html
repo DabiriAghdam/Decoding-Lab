@@ -1818,6 +1818,7 @@
       roundPicked = true;
       $('pickLeft').disabled = true;
       $('pickRight').disabled = true;
+      if (!arenaFinished) $('nextRound').disabled = false;
       const winner = Object.entries(methodWins).sort((a, b) => b[1] - a[1])[0];
 
       $('scoreNum').textContent = String(score);
