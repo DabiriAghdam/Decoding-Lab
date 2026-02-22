@@ -14,6 +14,23 @@ Interactive local dashboard for exploring decoding strategies from *The Curious 
   - `transformers`
   - other dependencies in `requirements.txt`
 
+## System Requirements
+- **OS**: macOS, Linux, or Windows 10/11
+- **Python**: 3.9 or newer
+- **CPU**: modern 64-bit CPU (Apple Silicon, Intel, or AMD)
+- **RAM**:
+  - Minimum: 8 GB (small models, slower experience)
+  - Recommended: 16 GB+ (for smoother use with `gpt2-large`)
+- **Storage**:
+  - At least 6 GB free for dependencies + model cache
+  - Recommended 10 GB+ if trying multiple models
+- **GPU (optional)**:
+  - macOS: Apple Silicon GPU via MPS (automatic if available)
+  - Linux/Windows: NVIDIA GPU with CUDA-capable PyTorch build
+- **Network**:
+  - Internet is needed the first time a model is downloaded from Hugging Face
+  - After download, models are loaded from local cache
+
 ## Setup
 If using your existing conda env named `presentation`:
 
