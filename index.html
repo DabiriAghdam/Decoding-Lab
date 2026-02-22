@@ -507,6 +507,24 @@
       font-weight: 700;
     }
 
+    .trace-wrap {
+      display: none;
+      border: 1px solid #d3e4d9;
+      border-radius: 12px;
+      background: #fff;
+      padding: 6px;
+      min-height: 180px;
+    }
+
+    .trace-wrap.visible {
+      display: block;
+    }
+
+    .trace-plot {
+      width: 100%;
+      height: 170px;
+    }
+
     .metric {
       border: 1px solid #d4e8dc;
       background: #edf9f1;
@@ -822,6 +840,10 @@
 
       <div class="toolbar">
         <button id="generateBoth" class="primary">Generate Both Samples</button>
+        <label class="chip" style="width:max-content;">
+          <input id="showSampleTrace" type="checkbox" />
+          Show token probability plot
+        </label>
         <span class="metric-help-wrap">
           <button class="metric-help" type="button" aria-label="Metric definitions">?</button>
           <span class="metric-help-pop">
@@ -842,6 +864,7 @@
           </div>
 
           <div id="sampleA" class="mono"></div>
+          <div id="traceWrapA" class="trace-wrap"><div id="traceA" class="trace-plot"></div></div>
           <div id="metricsA" class="metrics"></div>
           <div id="statusA" class="status"></div>
 
@@ -892,6 +915,7 @@
           </div>
 
           <div id="sampleB" class="mono"></div>
+          <div id="traceWrapB" class="trace-wrap"><div id="traceB" class="trace-plot"></div></div>
           <div id="metricsB" class="metrics"></div>
           <div id="statusB" class="status"></div>
 
@@ -1408,6 +1432,7 @@
       const data = await res.json();
       const text = data?.choices?.[0]?.text || '';
       return {
+        completionText: text,
         fullText: mergePromptCompletion(cfg.prompt, text),
         usage: data?.usage || null,
         performance: data?.performance || null,
@@ -1468,10 +1493,102 @@
       }
 
       return {
+        completionText: completion,
         fullText: mergePromptCompletion(cfg.prompt, completion),
         usage,
         performance,
       };
+    }
+
+    const sampleTrace = { a: null, b: null };
+    const sampleTraceContext = { a: null, b: null };
+
+    async function fetchTokenTrace(promptForModel, completionText) {
+      const res = await fetch('/api/local/token-probability-trace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: apiConfig().model,
+          prompt: promptForModel,
+          completion: completionText || '',
+          max_points: 200,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 220)}`);
+      const data = await res.json();
+      return Array.isArray(data?.trace) ? data.trace : [];
+    }
+
+    function drawSampleTrace(prefix) {
+      const wrap = $(`traceWrap${prefix.toUpperCase()}`);
+      const plotEl = $(`trace${prefix.toUpperCase()}`);
+      const show = Boolean($('showSampleTrace')?.checked);
+      if (!show) {
+        wrap.classList.remove('visible');
+        return;
+      }
+      wrap.classList.add('visible');
+      if (typeof Plotly === 'undefined') return;
+
+      const trace = sampleTrace[prefix] || [];
+      if (!trace.length) {
+        Plotly.react(plotEl, [], {
+          margin: { l: 44, r: 10, t: 8, b: 32 },
+          xaxis: { visible: false },
+          yaxis: { visible: false },
+          annotations: [{ x: 0.5, y: 0.5, xref: 'paper', yref: 'paper', showarrow: false, text: 'No trace yet', font: { size: 12 } }],
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+        }, { displayModeBar: false, responsive: true });
+        return;
+      }
+
+      const x = trace.map((p) => p.timestep);
+      const y = trace.map((p) => p.prob);
+      const text = trace.map((p) => `t=${p.timestep}<br>token=${safeTokenLabel(p.token || '')}<br>p=${Number(p.prob).toFixed(4)}`);
+      const lineColor = prefix === 'a' ? '#5c7ab7' : '#d78537';
+      const label = `Sample ${prefix.toUpperCase()}`;
+
+      Plotly.react(
+        plotEl,
+        [{
+          type: 'scatter',
+          mode: 'lines',
+          x,
+          y,
+          line: { color: lineColor, width: 2.5 },
+          name: label,
+          text,
+          hovertemplate: '%{text}<extra></extra>',
+        }],
+        {
+          margin: { l: 44, r: 10, t: 10, b: 36 },
+          xaxis: { title: 'Timestep', showgrid: false },
+          yaxis: { title: 'Probability', range: [0, 1], gridcolor: '#dce8e0' },
+          showlegend: false,
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+        },
+        { displayModeBar: false, responsive: true }
+      );
+    }
+
+    function refreshAllSampleTraces() {
+      drawSampleTrace('a');
+      drawSampleTrace('b');
+    }
+
+    async function ensureTraceForPrefix(prefix) {
+      if (!($('showSampleTrace')?.checked)) return;
+      if (sampleTrace[prefix]) return;
+      const ctx = sampleTraceContext[prefix];
+      if (!ctx) return;
+      try {
+        sampleTrace[prefix] = await fetchTokenTrace(ctx.promptForModel, ctx.completionText);
+      } catch (_) {
+        sampleTrace[prefix] = [];
+      }
+      drawSampleTrace(prefix);
     }
 
     function metricPills(container, text, performance, usage) {
@@ -1569,11 +1686,27 @@
           }
         );
 
+        sampleTraceContext[prefix] = {
+          promptForModel: cfg.model_prompt || cfg.prompt,
+          completionText: out.completionText || '',
+        };
+
+        if ($('showSampleTrace')?.checked) {
+          try {
+            sampleTrace[prefix] = await fetchTokenTrace(cfg.model_prompt || cfg.prompt, out.completionText || '');
+          } catch (_) {
+            sampleTrace[prefix] = [];
+          }
+        } else {
+          sampleTrace[prefix] = null;
+        }
+
         outputEl.textContent = out.fullText;
         modelUsage.tab1 = apiConfig().model;
         updateModelNotes();
         outputEl.classList.remove('generating');
         metricPills(metricsEl, out.fullText, out.performance, out.usage);
+        drawSampleTrace(prefix);
         statusEl.textContent = 'Done.';
         return out;
       } catch (err) {
@@ -1608,6 +1741,12 @@
     $('generateA').addEventListener('click', () => runSingle('a'));
     $('generateB').addEventListener('click', () => runSingle('b'));
     $('generateBoth').addEventListener('click', runBoth);
+    $('showSampleTrace').addEventListener('change', async () => {
+      if ($('showSampleTrace').checked) {
+        await Promise.all([ensureTraceForPrefix('a'), ensureTraceForPrefix('b')]);
+      }
+      refreshAllSampleTraces();
+    });
     $('promptTemplate').addEventListener('change', () => {
       const key = $('promptTemplate').value;
       if (promptTemplates[key]) {
@@ -2391,7 +2530,10 @@
     $('pCut').addEventListener('input', updateNextStrategyHint);
     $('kCut').addEventListener('input', updateNextStrategyHint);
     $('distN').addEventListener('change', fetchRealDistribution);
-    window.addEventListener('resize', drawDistribution);
+    window.addEventListener('resize', () => {
+      drawDistribution();
+      refreshAllSampleTraces();
+    });
 
     updateSampleTitle('a');
     updateSampleTitle('b');

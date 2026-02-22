@@ -445,6 +445,45 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             "vocab_size": vocab_size,
         }
 
+    def _token_probability_trace(self, runtime, prompt, completion_text, max_points=200):
+        tokenizer = runtime["tokenizer"]
+        model = runtime["model"]
+        device = runtime["device"]
+
+        prompt_ids = tokenizer(prompt, add_special_tokens=False)["input_ids"]
+        completion_ids = tokenizer(completion_text, add_special_tokens=False)["input_ids"]
+        if not completion_ids:
+            return []
+
+        if not prompt_ids:
+            prompt_ids = [int(tokenizer.eos_token_id or 0)]
+
+        completion_ids = completion_ids[: max(1, min(int(max_points), 400))]
+        seq_ids = prompt_ids + completion_ids
+        input_ids = torch.tensor([seq_ids], dtype=torch.long, device=device)
+
+        with torch.inference_mode():
+            logits = model(input_ids=input_ids).logits[0]
+
+        start = len(prompt_ids) - 1
+        target = torch.tensor(completion_ids, dtype=torch.long, device=device)
+        logits_slice = logits[start : start + len(completion_ids), :]
+        probs = torch.softmax(logits_slice, dim=-1)
+        token_probs = probs.gather(1, target.unsqueeze(1)).squeeze(1).detach().to("cpu")
+
+        trace = []
+        for i, tok_id in enumerate(completion_ids):
+            p = float(token_probs[i].item())
+            trace.append(
+                {
+                    "timestep": i + 1,
+                    "token": tokenizer.decode([int(tok_id)], clean_up_tokenization_spaces=False),
+                    "prob": max(p, 1e-12),
+                    "logprob": float(math.log(max(p, 1e-12))),
+                }
+            )
+        return trace
+
     def _sample_from_logits(self, logits, strategy, temperature, top_p, top_k):
         strategy = (strategy or "").strip().lower()
         if strategy not in ALLOWED_SAMPLING_STRATEGIES:
@@ -835,6 +874,34 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                         "top_k_rank": dist["top_k_rank"],
                         "top_p_rank": dist["top_p_rank"],
                         "vocab_size": dist["vocab_size"],
+                    },
+                )
+            except Exception as exc:
+                self._send_json(500, {"error": str(exc)})
+            return
+
+        if self.path == "/api/local/token-probability-trace":
+            model_id = _normalize_model_id(body.get("model"))
+            prompt = body.get("prompt")
+            completion = body.get("completion")
+            if prompt is None or completion is None:
+                self._send_json(400, {"error": "prompt and completion are required"})
+                return
+            try:
+                runtime = _load_runtime(model_id)
+                trace = self._token_probability_trace(
+                    runtime=runtime,
+                    prompt=prompt,
+                    completion_text=completion,
+                    max_points=body.get("max_points", 200),
+                )
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "model": model_id,
+                        "device": runtime["device"],
+                        "trace": trace,
                     },
                 )
             except Exception as exc:
