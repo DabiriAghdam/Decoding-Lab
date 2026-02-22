@@ -505,6 +505,14 @@
       min-height: 72px;
     }
 
+    #sharedPrompt {
+      min-height: 72px;
+    }
+
+    .stack-controls {
+      grid-template-columns: 1fr;
+    }
+
     .kpis {
       display: grid;
       gap: 8px;
@@ -582,7 +590,6 @@
           </select>
         </div>
         <button id="preloadModel">Preload Model</button>
-        <button id="testConn">Test Backend</button>
       </div>
       <div id="connStatus" class="status"></div>
       <div id="serverWarning" class="server-warning"></div>
@@ -596,7 +603,7 @@
 
     <section id="tab1" class="panel">
       <div class="card" style="margin-bottom:12px;">
-        <div class="controls">
+        <div class="controls stack-controls">
           <div class="field">
             <label for="promptTemplate">Prompt Template</label>
             <select id="promptTemplate">
@@ -1208,25 +1215,6 @@
       }
     });
     $('themeSelect').addEventListener('change', () => applyTheme($('themeSelect').value));
-
-    $('testConn').addEventListener('click', async () => {
-      const connStatus = $('connStatus');
-      connStatus.textContent = 'Testing backend...';
-      try {
-        const res = await fetch('/api/local/health', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: apiConfig().model }),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const payload = await res.json();
-        connStatus.textContent = payload.loaded
-          ? `Backend ready (${payload.model})`
-          : `Backend reachable (${payload.model}), model not loaded yet`;
-      } catch (err) {
-        connStatus.textContent = `Connection failed: ${err.message}`;
-      }
-    });
 
     $('preloadModel').addEventListener('click', async () => {
       const connStatus = $('connStatus');
