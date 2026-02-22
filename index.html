@@ -1047,11 +1047,11 @@
             <label for="wmTemp">Temperature: <span id="wmTempVal">1.00</span></label>
             <input id="wmTemp" type="range" min="0.00" max="2.00" step="0.05" value="1.00" />
           </div>
-          <div class="field">
+          <div class="field" id="wmTopPWrap">
             <label for="wmTopP">Top-p: <span id="wmTopPVal">0.92</span></label>
             <input id="wmTopP" type="range" min="0.10" max="1.00" step="0.01" value="0.92" />
           </div>
-          <div class="field">
+          <div class="field" id="wmTopKWrap">
             <label for="wmTopK">Top-k: <span id="wmTopKVal">40</span></label>
             <input id="wmTopK" type="range" min="1" max="120" step="1" value="40" />
           </div>
@@ -1421,10 +1421,21 @@
       $(`${prefix}BeamWrap`).style.display = showBeam ? '' : 'none';
     }
 
+    function updateWmControls() {
+      const strategy = $('wmStrategy').value;
+      const showTemp = strategy === 'topk' || strategy === 'topp' || strategy === 'sample';
+      const showTopK = strategy === 'topk';
+      const showTopP = strategy === 'topp';
+      $('wmTemp').closest('.field').style.display = showTemp ? '' : 'none';
+      $('wmTopKWrap').style.display = showTopK ? '' : 'none';
+      $('wmTopPWrap').style.display = showTopP ? '' : 'none';
+    }
+
     ['aStrategy', 'aTemp', 'aTopk', 'aTopp', 'aBeam'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('a')));
     ['bStrategy', 'bTemp', 'bTopk', 'bTopp', 'bBeam'].forEach((id) => $(id).addEventListener('input', () => updateSampleTitle('b')));
     $('aStrategy').addEventListener('change', () => { updateSampleTitle('a'); updateMethodControls('a'); });
     $('bStrategy').addEventListener('change', () => { updateSampleTitle('b'); updateMethodControls('b'); });
+    $('wmStrategy').addEventListener('change', updateWmControls);
 
     const genStatusEl = $('genStatus');
 
@@ -2237,6 +2248,7 @@
     updateSampleTitle('b');
     updateMethodControls('a');
     updateMethodControls('b');
+    updateWmControls();
     try {
       const savedTheme = localStorage.getItem('decoding_theme') || 'forest';
       $('themeSelect').value = savedTheme;
