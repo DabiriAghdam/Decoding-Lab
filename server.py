@@ -110,7 +110,58 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
         self.wfile.flush()
 
-    def _generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1):
+    def _normalize_decoding_params(self, strategy, temperature, top_p, top_k, beam_size):
+        strategy = (strategy or "").strip().lower()
+        normalized = {
+            "strategy": strategy,
+            "temperature": float(temperature if temperature is not None else 1.0),
+            "top_p": float(top_p if top_p is not None else 1.0),
+            "top_k": int(top_k) if top_k is not None else 0,
+            "beam_size": max(1, int(beam_size or 1)),
+        }
+
+        if normalized["strategy"] not in {"greedy", "beam", "topk", "topp", "sample"}:
+            # Fallback inference for older payloads that do not send explicit strategy.
+            if normalized["beam_size"] > 1:
+                normalized["strategy"] = "beam"
+            elif normalized["temperature"] <= 0.0001:
+                normalized["strategy"] = "greedy"
+            elif normalized["top_p"] < 0.999999 and normalized["top_p"] > 0:
+                normalized["strategy"] = "topp"
+            elif normalized["top_k"] > 0:
+                normalized["strategy"] = "topk"
+            else:
+                normalized["strategy"] = "sample"
+
+        if normalized["strategy"] == "greedy":
+            normalized["temperature"] = 0.0
+            normalized["top_p"] = 1.0
+            normalized["top_k"] = 0
+            normalized["beam_size"] = 1
+        elif normalized["strategy"] == "beam":
+            normalized["temperature"] = 0.0
+            normalized["top_p"] = 1.0
+            normalized["top_k"] = 0
+            normalized["beam_size"] = max(2, normalized["beam_size"])
+        elif normalized["strategy"] == "topk":
+            normalized["temperature"] = max(normalized["temperature"], 0.05)
+            normalized["top_k"] = max(1, normalized["top_k"] or 40)
+            normalized["top_p"] = 1.0
+            normalized["beam_size"] = 1
+        elif normalized["strategy"] == "topp":
+            normalized["temperature"] = max(normalized["temperature"], 0.05)
+            normalized["top_p"] = min(max(normalized["top_p"], 0.01), 1.0)
+            normalized["top_k"] = 0
+            normalized["beam_size"] = 1
+        else:  # sample
+            normalized["temperature"] = max(normalized["temperature"], 0.05)
+            normalized["top_p"] = 1.0
+            normalized["top_k"] = 0
+            normalized["beam_size"] = 1
+
+        return normalized
+
+    def _generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1, strategy=None):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
         device = runtime["device"]
@@ -122,34 +173,35 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             attention_mask = attention_mask.to(device)
 
         max_tokens = max(1, min(int(max_tokens), 200))
-        temperature = float(temperature)
-        top_p = float(top_p)
-        top_k = int(top_k) if top_k is not None else 0
-
-        beam_size = max(1, int(beam_size or 1))
-        do_sample = (temperature > 0.0001) and beam_size == 1
+        decoding = self._normalize_decoding_params(
+            strategy=strategy,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            beam_size=beam_size,
+        )
         gen_kwargs = {
             "max_new_tokens": max_tokens,
             "pad_token_id": tokenizer.pad_token_id,
         }
-        if beam_size > 1:
+        if decoding["strategy"] == "beam":
             gen_kwargs.update(
                 {
                     "do_sample": False,
-                    "num_beams": beam_size,
+                    "num_beams": decoding["beam_size"],
                     "early_stopping": True,
                 }
             )
-        elif do_sample:
+        elif decoding["strategy"] in {"topk", "topp", "sample"}:
             gen_kwargs.update(
                 {
                     "do_sample": True,
-                    "temperature": max(temperature, 0.05),
-                    "top_p": min(max(top_p, 0.01), 1.0),
+                    "temperature": decoding["temperature"],
+                    # Explicitly set both to avoid GenerationConfig defaults (e.g., top_k=50).
+                    "top_k": decoding["top_k"],
+                    "top_p": decoding["top_p"],
                 }
             )
-            if top_k > 0:
-                gen_kwargs["top_k"] = top_k
         else:
             gen_kwargs.update({"do_sample": False})
 
@@ -173,7 +225,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             "tokens_per_second": float(completion_tokens / elapsed_s),
         }
 
-    def _stream_generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1):
+    def _stream_generate(self, runtime, prompt, max_tokens, temperature, top_p, top_k, beam_size=1, strategy=None):
         tokenizer = runtime["tokenizer"]
         model = runtime["model"]
         device = runtime["device"]
@@ -185,11 +237,13 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             attention_mask = attention_mask.to(device)
 
         max_tokens = max(1, min(int(max_tokens), 200))
-        temperature = float(temperature)
-        top_p = float(top_p)
-        top_k = int(top_k) if top_k is not None else 0
-        beam_size = max(1, int(beam_size or 1))
-        do_sample = (temperature > 0.0001) and beam_size == 1
+        decoding = self._normalize_decoding_params(
+            strategy=strategy,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            beam_size=beam_size,
+        )
 
         streamer = TextIteratorStreamer(
             tokenizer,
@@ -203,24 +257,24 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             "pad_token_id": tokenizer.pad_token_id,
             "streamer": streamer,
         }
-        if beam_size > 1:
+        if decoding["strategy"] == "beam":
             gen_kwargs.update(
                 {
                     "do_sample": False,
-                    "num_beams": beam_size,
+                    "num_beams": decoding["beam_size"],
                     "early_stopping": True,
                 }
             )
-        elif do_sample:
+        elif decoding["strategy"] in {"topk", "topp", "sample"}:
             gen_kwargs.update(
                 {
                     "do_sample": True,
-                    "temperature": max(temperature, 0.05),
-                    "top_p": min(max(top_p, 0.01), 1.0),
+                    "temperature": decoding["temperature"],
+                    # Explicitly set both to avoid GenerationConfig defaults (e.g., top_k=50).
+                    "top_k": decoding["top_k"],
+                    "top_p": decoding["top_p"],
                 }
             )
-            if top_k > 0:
-                gen_kwargs["top_k"] = top_k
         else:
             gen_kwargs["do_sample"] = False
 
@@ -598,8 +652,9 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         tp = body.get("top_p")
         tm = body.get("temperature")
         tk = body.get("top_k")
+        st = body.get("strategy")
         print(
-            f"[POST] {self.path} model={model_for_log} max_tokens={mt} temp={tm} top_p={tp} top_k={tk}",
+            f"[POST] {self.path} model={model_for_log} strategy={st} max_tokens={mt} temp={tm} top_p={tp} top_k={tk}",
             flush=True,
         )
 
@@ -639,6 +694,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                     top_p=body.get("top_p", 1.0),
                     top_k=body.get("top_k"),
                     beam_size=body.get("beam_size", 1),
+                    strategy=body.get("strategy"),
                 )
                 payload = {
                     "id": f"local-{int(time.time() * 1000)}",
@@ -688,6 +744,7 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                     top_p=body.get("top_p", 1.0),
                     top_k=body.get("top_k"),
                     beam_size=body.get("beam_size", 1),
+                    strategy=body.get("strategy"),
                 ):
                     self._send_sse(event)
                 self.close_connection = True

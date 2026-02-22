@@ -710,7 +710,7 @@
             <option value="gpt2-xl">gpt2-xl</option>
             <option value="gpt2-medium">gpt2-medium</option>
             <option value="Qwen/Qwen3-0.6B">Qwen3-0.6B</option>
-            <option value="Qwen/Qwen2.5-0.5B">Qwen/Qwen2.5-0.5B</option>
+            <option value="Qwen/Qwen2.5-0.5B">Qwen2.5-0.5B</option>
           </select>
         </div>
         <button id="preloadModel">Load Model</button>
@@ -1064,7 +1064,7 @@
             <input id="wmKey" type="text" value="15485863" />
           </div>
 
-          <button id="wmGenerate" class="primary">Generate Watermarked Text (Streaming)</button>
+          <button id="wmGenerate" class="primary">Generate Watermarked Text</button>
           <div id="wmStatus" class="status"></div>
         </div>
 
@@ -1268,6 +1268,7 @@
         model: apiConfig().model,
         prompt: cfg.prompt,
         max_tokens: cfg.max_tokens,
+        strategy: cfg.strategy,
       };
       if (cfg.strategy === 'greedy') {
         body.temperature = 0;
@@ -1536,7 +1537,7 @@
 
     $('preloadModel').addEventListener('click', async () => {
       const connStatus = $('connStatus');
-      connStatus.textContent = 'Preloading model...';
+      connStatus.textContent = 'Loading model...';
       drawChartMessage(`Loading model: ${apiConfig().model}...`);
       $('distStatus').textContent = 'Waiting for model to load...';
       try {
@@ -1550,7 +1551,7 @@
         connStatus.textContent = `Loaded on ${payload.device || 'device'} in ${payload.loaded_in_s || '?'}s`;
         await fetchRealDistribution();
       } catch (err) {
-        connStatus.textContent = `Preload failed: ${err.message}`;
+        connStatus.textContent = `Load failed: ${err.message}`;
       }
     });
 
@@ -2191,6 +2192,7 @@
           model: apiConfig().model,
           prompt,
           max_tokens: 1,
+          strategy,
         };
         if (strategy === 'greedy') {
           body.temperature = 0;
@@ -2264,7 +2266,7 @@
     }
     $('arenaStatus').textContent = 'Ready.';
     $('distStatus').textContent = 'Ready.';
-    drawChartMessage('Click "Preload Model" or open this tab to load distribution.');
+    drawChartMessage('Click "Load Model" or open this tab to load distribution.');
 
     checkApiServer();
     setTimeout(() => { $('preloadModel').click(); }, 0);
