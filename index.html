@@ -1826,9 +1826,35 @@
       }
     }
 
+    function resetArenaState(message) {
+      round = 0;
+      arenaRound = 0;
+      score = 0;
+      roundPicked = false;
+      arenaFinished = false;
+      randomArenaPairKey = null;
+      Object.keys(methodWins).forEach((k) => { methodWins[k] = 0; });
+      $('scoreNum').textContent = '0';
+      $('roundNum').textContent = '1';
+      $('roundResult').textContent = '';
+      $('revealBox').textContent = '';
+      $('arenaStatus').textContent = message;
+      $('leftText').textContent = '';
+      $('rightText').textContent = '';
+      $('leftMeta').textContent = '';
+      $('rightMeta').textContent = '';
+      $('nextRound').disabled = false;
+      $('genRound').disabled = false;
+      $('pickLeft').disabled = false;
+      $('pickRight').disabled = false;
+    }
+
     $('pickLeft').addEventListener('click', () => evaluatePick(true));
     $('pickRight').addEventListener('click', () => evaluatePick(false));
     $('genRound').addEventListener('click', loadRound);
+    $('arenaPair').addEventListener('change', () => {
+      resetArenaState('Method pair changed. Generate round 1.');
+    });
     $('nextRound').addEventListener('click', () => {
       if (arenaFinished) return;
       if (!roundPicked) {
@@ -1841,26 +1867,7 @@
       loadRound();
     });
     $('restartArena').addEventListener('click', () => {
-      round = 0;
-      arenaRound = 0;
-      score = 0;
-      roundPicked = false;
-      arenaFinished = false;
-      randomArenaPairKey = null;
-      Object.keys(methodWins).forEach((k) => { methodWins[k] = 0; });
-      $('scoreNum').textContent = '0';
-      $('roundNum').textContent = '1';
-      $('roundResult').textContent = '';
-      $('revealBox').textContent = '';
-      $('arenaStatus').textContent = 'Arena reset. Generate round 1.';
-      $('leftText').textContent = '';
-      $('rightText').textContent = '';
-      $('leftMeta').textContent = '';
-      $('rightMeta').textContent = '';
-      $('nextRound').disabled = false;
-      $('genRound').disabled = false;
-      $('pickLeft').disabled = false;
-      $('pickRight').disabled = false;
+      resetArenaState('Arena reset. Generate round 1.');
     });
 
     async function generateWatermarked() {
