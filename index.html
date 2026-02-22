@@ -404,6 +404,22 @@
       letter-spacing: 0.01em;
     }
 
+    .metric-help {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid #b8d9c6;
+      background: #eef9f2;
+      color: #1f4a34;
+      font-size: 0.72rem;
+      font-weight: 800;
+      cursor: help;
+      user-select: none;
+    }
+
     .controls {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -760,6 +776,11 @@
 
       <div class="toolbar">
         <button id="generateBoth" class="primary">Generate Both Samples</button>
+        <span
+          class="metric-help"
+          title="Zipf coef: slope-based lexical concentration estimate. Rep-2/3/4: repeated n-gram rates (higher means more repetition). Words: total word count. Tok/s: completion tokens per second. Generated: completion token count."
+          aria-label="Metric definitions"
+        >?</span>
         <div id="genStatus" class="status"></div>
       </div>
 

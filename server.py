@@ -116,7 +116,6 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         self,
         body,
         default_max_tokens=120,
-        default_temperature=0.9,
         allowed_strategies=None,
     ):
         allowed = allowed_strategies or ALLOWED_DECODE_STRATEGIES
@@ -127,8 +126,8 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             raise ValueError(f"strategy is required and must be one of: {supported}")
         return {
             "max_tokens": body.get("max_tokens", default_max_tokens),
-            "temperature": body.get("temperature", default_temperature),
-            "top_p": body.get("top_p", 1.0),
+            "temperature": body.get("temperature"),
+            "top_p": body.get("top_p"),
             "top_k": body.get("top_k"),
             "beam_size": body.get("beam_size", 1),
             "strategy": strategy,
@@ -138,36 +137,48 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
         strategy = (strategy or "").strip().lower()
         if strategy not in ALLOWED_DECODE_STRATEGIES:
             raise ValueError("Unsupported strategy")
-        normalized = {
-            "strategy": strategy,
-            "temperature": float(temperature if temperature is not None else 1.0),
-            "top_p": float(top_p if top_p is not None else 1.0),
-            "top_k": int(top_k) if top_k is not None else 0,
-            "beam_size": max(1, int(beam_size or 1)),
-        }
+        normalized = {"strategy": strategy, "beam_size": max(1, int(beam_size or 1))}
 
-        if normalized["strategy"] == "greedy":
+        if strategy == "greedy":
             normalized["temperature"] = 0.0
             normalized["top_p"] = 1.0
             normalized["top_k"] = 0
             normalized["beam_size"] = 1
-        elif normalized["strategy"] == "beam":
+        elif strategy == "beam":
             normalized["temperature"] = 0.0
             normalized["top_p"] = 1.0
             normalized["top_k"] = 0
             normalized["beam_size"] = max(2, normalized["beam_size"])
-        elif normalized["strategy"] == "topk":
-            normalized["temperature"] = max(normalized["temperature"], 0.05)
-            normalized["top_k"] = max(1, normalized["top_k"] or 40)
+        elif strategy == "topk":
+            if temperature is None:
+                raise ValueError("temperature is required for top-k strategy")
+            if top_k is None:
+                raise ValueError("top_k is required for top-k strategy")
+            normalized["temperature"] = float(temperature)
+            if normalized["temperature"] <= 0.0:
+                raise ValueError("temperature must be > 0 for top-k strategy")
+            normalized["top_k"] = int(top_k)
+            if normalized["top_k"] < 1:
+                raise ValueError("top_k must be >= 1 for top-k strategy")
             normalized["top_p"] = 1.0
             normalized["beam_size"] = 1
-        elif normalized["strategy"] == "topp":
-            normalized["temperature"] = max(normalized["temperature"], 0.05)
-            normalized["top_p"] = min(max(normalized["top_p"], 0.01), 1.0)
+        elif strategy == "topp":
+            if temperature is None:
+                raise ValueError("temperature is required for top-p strategy")
+            if top_p is None:
+                raise ValueError("top_p is required for top-p strategy")
+            normalized["temperature"] = float(temperature)
+            if normalized["temperature"] <= 0.0:
+                raise ValueError("temperature must be > 0 for top-p strategy")
+            normalized["top_p"] = float(top_p)
+            if not (0.0 < normalized["top_p"] <= 1.0):
+                raise ValueError("top_p must be in (0, 1] for top-p strategy")
             normalized["top_k"] = 0
             normalized["beam_size"] = 1
         else:  # sample
-            normalized["temperature"] = max(normalized["temperature"], 0.0)
+            if temperature is None:
+                raise ValueError("temperature is required for sample strategy")
+            normalized["temperature"] = float(temperature)
             normalized["top_p"] = 1.0
             normalized["top_k"] = 0
             normalized["beam_size"] = 1
@@ -448,7 +459,9 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             return int(torch.multinomial(probs, 1).item())
 
         if strategy == "topk":
-            k = max(1, min(int(top_k or 40), vocab_size))
+            if top_k is None:
+                raise ValueError("top_k is required for top-k strategy")
+            k = max(1, min(int(top_k), vocab_size))
             topk_probs, topk_idx = torch.topk(probs, k)
             denom = torch.sum(topk_probs)
             if float(denom.item()) <= 0:
@@ -457,6 +470,8 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
             sample_idx = int(torch.multinomial(topk_probs, 1).item())
             return int(topk_idx[sample_idx].item())
 
+        if top_p is None:
+            raise ValueError("top_p is required for top-p strategy")
         p = min(max(float(top_p), 0.01), 1.0)
         sorted_probs, sorted_idx = torch.sort(probs, descending=True)
         cumulative = torch.cumsum(sorted_probs, dim=-1)
@@ -835,8 +850,14 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                 params = self._parse_decode_request(
                     body,
                     default_max_tokens=80,
-                    default_temperature=1.0,
                     allowed_strategies=ALLOWED_SAMPLING_STRATEGIES,
+                )
+                decoded = self._normalize_decoding_params(
+                    strategy=params["strategy"],
+                    temperature=params["temperature"],
+                    top_p=params["top_p"],
+                    top_k=params["top_k"],
+                    beam_size=1,
                 )
                 runtime = _load_runtime(model_id)
                 self._send_sse({"type": "status", "message": "runtime_ready", "device": runtime["device"]})
@@ -844,10 +865,10 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                     runtime=runtime,
                     prompt=prompt,
                     max_tokens=params["max_tokens"],
-                    strategy=params["strategy"],
-                    temperature=params["temperature"],
-                    top_p=params["top_p"],
-                    top_k=params["top_k"],
+                    strategy=decoded["strategy"],
+                    temperature=decoded["temperature"],
+                    top_p=decoded["top_p"],
+                    top_k=decoded["top_k"],
                     gamma=body.get("gamma", 0.25),
                     delta=body.get("delta", 2.0),
                     seeding_key=body.get("seeding_key", 15485863),
@@ -871,18 +892,24 @@ class DecodingLabAPIHandler(SimpleHTTPRequestHandler):
                 params = self._parse_decode_request(
                     body,
                     default_max_tokens=80,
-                    default_temperature=1.0,
                     allowed_strategies=ALLOWED_SAMPLING_STRATEGIES,
+                )
+                decoded = self._normalize_decoding_params(
+                    strategy=params["strategy"],
+                    temperature=params["temperature"],
+                    top_p=params["top_p"],
+                    top_k=params["top_k"],
+                    beam_size=1,
                 )
                 runtime = _load_runtime(model_id)
                 gen = self._generate_kgw_watermarked(
                     runtime=runtime,
                     prompt=prompt,
                     max_tokens=params["max_tokens"],
-                    strategy=params["strategy"],
-                    temperature=params["temperature"],
-                    top_p=params["top_p"],
-                    top_k=params["top_k"],
+                    strategy=decoded["strategy"],
+                    temperature=decoded["temperature"],
+                    top_p=decoded["top_p"],
+                    top_k=decoded["top_k"],
                     gamma=body.get("gamma", 0.25),
                     delta=body.get("delta", 2.0),
                     seeding_key=body.get("seeding_key", 15485863),
