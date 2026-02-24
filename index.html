@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Neural Text Degeneration Explorer</title>
+  <title>The Curious Case of Neural Text Degeneration</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
@@ -749,6 +749,7 @@
         position: static;
         width: auto;
       }
+      .no-bold { font-weight: normal; }
       .hero-row { grid-template-columns: 1fr; }
       .toolbar { grid-template-columns: 1fr; }
       .grid-2,
@@ -767,9 +768,9 @@
 <body>
   <div class="app">
     <header class="hero">
-      <h1 class="hero-title">Neural Text Degeneration Explorer</h1>
-      <p class="hero-subtitle">Built for exploring Holtzman et al. (2019) and beyond, as a presentation dashboard for CPSC 532B.</p>
-      <p class="hero-note">Project scope: interactive comparison of greedy, top-k, top-p, and beam search with live distribution analysis and blind preference rounds.</p>
+      <h1 class="hero-title">The Curious Case of Neural Text <em class="no-bold">De</em>generation</h1>
+      <p class="hero-subtitle">Decoding Lab built for exploring Holtzman et al. (2019) and beyond, as a presentation dashboard for CPSC 532B.</p>
+      <p class="hero-note">Interactive comparison of greedy, beam search, pure sampling, top-k, and nucleus (top-p), with live token distribution analysis, blind preference rounds, and token-level watermarking illustration.</p>
       <div class="field theme-topright">
         <label for="themeSelect">Theme</label>
         <select id="themeSelect">
@@ -799,7 +800,7 @@
       <button class="tab-btn active" data-tab="tab3">Distribution Explorer</button>
       <button class="tab-btn" data-tab="tab1">Side-by-Side Decode</button>
       <button class="tab-btn" data-tab="tab2">Human Preference Arena</button>
-      <button class="tab-btn" data-tab="tab4">KGW Watermark (Bonus)</button>
+      <button class="tab-btn" data-tab="tab4">Token-level Watermark (KGW)</button>
     </nav>
 
     <section id="tab1" class="panel">
@@ -1190,7 +1191,7 @@
       </div>
     </section>
   </div>
-  <footer class="site-footer">Made with ❤️ for CPSC 532B · Decoding Dashboard Explorer</footer>
+  <footer class="site-footer">Decoding Lab · Made with ❤️ for CPSC 532B</footer>
 
   <script>
     const $ = (id) => document.getElementById(id);
