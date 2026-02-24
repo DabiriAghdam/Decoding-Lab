@@ -1,80 +1,39 @@
-# Decoding Dashboard Explorer (CPSC 532B)
+# The Curious Case of Neural Text Degeneration
 
-Interactive local dashboard for exploring decoding strategies from *The Curious Case of Neural Text Degeneration* (Holtzman et al., 2019), plus side-by-side comparisons and preference rounds.
+Decoding Lab built for exploring Holtzman et al. (2019) and beyond, as a presentation dashboard for CPSC 532B.
 
-## What this project includes
-- **Distribution Explorer**: next-token probability chart with top-k and top-p overlays.
-- **Side-by-Side Decode**: compare two decoding strategies on the same prompt.
-- **Human Preference Arena**: blind pairwise rounds to see which decoding style is preferred.
+Interactive comparison of greedy, beam search, pure sampling, top-k, and nucleus (top-p), with live token distribution analysis, blind preference rounds, and token-level watermarking illustration.
+
+## Features
+- **Distribution Explorer**: next-token probability chart with top-k and top-p overlays
+- **Side-by-Side Decode**: compare two decoding strategies on the same prompt
+- **Human Preference Arena**: blind pairwise rounds to evaluate decoding methods
+- **Token-level Watermark (KGW)**: illustrates the KGW token-level watermarking technique
 
 ## Requirements
 - Python 3.9+
-- A local environment with:
-  - `torch`
-  - `transformers`
-  - other dependencies in `requirements.txt`
-
-## System Requirements
-- **OS**: macOS, Linux, or Windows 10/11
-- **Python**: 3.9 or newer
-- **CPU**: modern 64-bit CPU (Apple Silicon, Intel, or AMD)
-- **RAM**:
-  - Minimum: 8 GB (small models, slower experience)
-  - Recommended: 16 GB+ (for smoother use with `gpt2-large`)
-- **Storage**:
-  - At least 6 GB free for dependencies + model cache
-  - Recommended 10 GB+ if trying multiple models
-- **GPU (optional)**:
-  - macOS: Apple Silicon GPU via MPS (automatic if available)
-  - Linux/Windows: NVIDIA GPU with CUDA-capable PyTorch build
-- **Network**:
-  - Internet is needed the first time a model is downloaded from Hugging Face
-  - After download, models are loaded from local cache
+- Dependencies: `torch`, `transformers` (see `requirements.txt`)
+- Internet connection for first-time model download from Hugging Face
+- Recommended: 16 GB+ RAM for smooth use with `gpt2-large`
 
 ## Setup
-If using your existing conda env named `presentation`:
-
+Create an environment and then run this: 
 ```bash
-conda activate presentation
+conda activate presentation  # or your Python 3.9+ environment
 pip install -r requirements.txt
 ```
 
-If `torch`/`transformers` are missing, install them in the same env before running.
-
 ## Run
-From the project root:
-
+Finally to run the server simply run this:
 ```bash
 python3 server.py
 ```
 
-Then open:
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) on your browser to access the dashboard.
 
-- [http://127.0.0.1:8000](http://127.0.0.1:8000)
+**Optional**: Override host/port with `HOST=127.0.0.1 PORT=8017 python3 server.py`
 
-Optional host/port override:
-
-```bash
-HOST=127.0.0.1 PORT=8017 python3 server.py
-```
-
-## Windows and Linux
-Yes, the project runs on both.
-
-- **Linux**:
-  ```bash
-  python3 server.py
-  ```
-- **Windows (PowerShell)**:
-  ```powershell
-  py server.py
-  ```
-- **Windows (host/port override)**:
-  ```powershell
-  $env:HOST="127.0.0.1"; $env:PORT="8017"; py server.py
-  ```
-
-## Troubleshooting
-- **Address already in use**: run on a different port, e.g. `PORT=8017 python3 server.py`.
-- **Slow first request**: first load includes model initialization; later requests are faster.
-- **Model load errors**: verify model name exists in the dropdown and dependencies are installed in the active env.
+## Notes
+- First run downloads models from Hugging Face (requires internet)
+- Model initialization may take a moment; subsequent requests are faster
+- Works on macOS, Linux, and Windows (only tested on macOS)
