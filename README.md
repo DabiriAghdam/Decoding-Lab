@@ -9,6 +9,19 @@ Interactive comparison of greedy, beam search, pure sampling, top-k, and nucleus
 - **Side-by-Side Decode**: compare two decoding strategies on the same prompt
 - **Human Preference Arena**: blind pairwise rounds to evaluate decoding methods
 - **Token-level Watermark (KGW)**: illustrates the KGW token-level watermarking technique
+## Screenshots
+
+### Distribution Explorer
+<img src="screenshots/dist.png" width="600" alt="Distribution Explorer">
+
+### Side-by-Side Decode
+<img src="screenshots/decode.png" width="600" alt="Side-by-Side Decode">
+
+### Human Preference Arena
+<img src="screenshots/arena.png" width="600" alt="Human Preference Arena">
+
+### Token-level Watermark (KGW)
+<img src="screenshots/watermark.png" width="600" alt="Token-level Watermark">
 
 ## Requirements
 - Python 3.9+
